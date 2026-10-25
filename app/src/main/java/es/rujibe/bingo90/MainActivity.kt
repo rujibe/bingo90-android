@@ -331,7 +331,6 @@ private fun MiBingoApp() {
                         }
                     }
                     }
-                    }
                     if (compactSix) {
                         Column(
                             Modifier.align(Alignment.CenterStart).fillMaxHeight().width(56.dp)
