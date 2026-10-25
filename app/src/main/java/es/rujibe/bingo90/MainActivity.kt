@@ -40,6 +40,7 @@ private val Green = Color(0xFF16A34A)
 private val Purple = Color(0xFF7717D6)
 private const val MAX_ACTIVE = 6
 private data class Ticket(val id: Long, val name: String, val grid: List<List<Int>>, val marked: Set<Int> = emptySet())
+private data class TicketPackage(val id: Long, val name: String, val tickets: List<Ticket>)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,6 +89,11 @@ private fun MiBingoApp() {
     var editorGrid by remember { mutableStateOf(List(3) { List(9) { 0 } }) }
     var editingCell by remember { mutableIntStateOf(-1) }
     val selectedSavedIds = remember { mutableStateListOf<Long>() }
+    val ticketPackages = remember { mutableStateListOf<TicketPackage>().apply { addAll(loadTicketPackages(ctx)) } }
+    val selectedPackageTicketKeys = remember { mutableStateListOf<String>() }
+    val expandedPackageIds = remember { mutableStateListOf<Long>() }
+    var packageNameInput by remember { mutableStateOf("") }
+    var showSavePackageDialog by remember { mutableStateOf(false) }
     val selectedChooseIds = remember { mutableStateListOf<Long>() }
     var chooseSearch by remember { mutableStateOf("") }
 
@@ -262,9 +268,9 @@ private fun MiBingoApp() {
                         val spacing = 4.dp
                         val availablePerTicket = (maxHeight - spacing * (visibleCount - 1)) / visibleCount
                         val preferredHeight = when (visibleCount) {
-                            1 -> 250.dp
-                            2 -> 205.dp
-                            3 -> 168.dp
+                            1 -> 138.dp
+                            2 -> 138.dp
+                            3 -> 138.dp
                             4 -> 138.dp
                             5 -> 112.dp
                             else -> 96.dp
@@ -346,22 +352,74 @@ private fun MiBingoApp() {
                 }
                 "saved" -> {
                     val savedCards = cards.filter { it.id !in (1L..1000L) }
+                    val selectedCount = selectedSavedIds.size + selectedPackageTicketKeys.size
                     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Cartones guardados: ${savedCards.size}. Puedes guardar tantos como quieras.", fontWeight = FontWeight.Bold)
+                        Text("Paquetes y cartones guardados", fontWeight = FontWeight.Bold)
+                        Text("Seleccionados: $selectedCount/$MAX_ACTIVE. Puedes combinar cartones de paquetes distintos y cartones sueltos.", style = MaterialTheme.typography.bodySmall)
                         LazyColumn(
                             Modifier.weight(1f).fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(savedCards, key = { it.id }) { ticket ->
+                            if (ticketPackages.isNotEmpty()) {
+                                item(key = "package-heading") { Text("PAQUETES", fontWeight = FontWeight.ExtraBold, color = DarkRed) }
+                                items(ticketPackages, key = { "pkg-${it.id}" }) { pkg ->
+                                    val packageKeys = pkg.tickets.indices.map { "${pkg.id}:$it" }
+                                    val allSelected = packageKeys.isNotEmpty() && packageKeys.all { it in selectedPackageTicketKeys }
+                                    Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
+                                        Column(Modifier.fillMaxWidth().padding(6.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(
+                                                    checked = allSelected,
+                                                    onCheckedChange = { checked ->
+                                                        if (checked) {
+                                                            packageKeys.forEach { key ->
+                                                                if (key !in selectedPackageTicketKeys && selectedCount + (selectedPackageTicketKeys.size - selectedPackageTicketKeys.count { it in packageKeys }) < MAX_ACTIVE) selectedPackageTicketKeys.add(key)
+                                                            }
+                                                        } else selectedPackageTicketKeys.removeAll(packageKeys.toSet())
+                                                    }
+                                                )
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(pkg.name, fontWeight = FontWeight.Bold)
+                                                    Text("${pkg.tickets.size} cartones · copias independientes", style = MaterialTheme.typography.bodySmall)
+                                                }
+                                                TextButton(onClick = {
+                                                    if (pkg.id in expandedPackageIds) expandedPackageIds.remove(pkg.id) else expandedPackageIds.add(pkg.id)
+                                                }) { Text(if (pkg.id in expandedPackageIds) "Ocultar" else "Ver") }
+                                            }
+                                            if (pkg.id in expandedPackageIds) {
+                                                pkg.tickets.forEachIndexed { index, ticket ->
+                                                    val key = "${pkg.id}:$index"
+                                                    Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                        Checkbox(
+                                                            checked = key in selectedPackageTicketKeys,
+                                                            onCheckedChange = { checked ->
+                                                                if (checked && key !in selectedPackageTicketKeys && selectedCount < MAX_ACTIVE) selectedPackageTicketKeys.add(key)
+                                                                if (!checked) selectedPackageTicketKeys.remove(key)
+                                                            },
+                                                            enabled = key in selectedPackageTicketKeys || selectedCount < MAX_ACTIVE
+                                                        )
+                                                        Column(Modifier.weight(1f)) {
+                                                            Text(ticket.name, fontWeight = FontWeight.Medium)
+                                                            TicketPreviewGrid(ticket.grid)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item(key = "singles-heading") { Text("CARTONES SUELTOS", fontWeight = FontWeight.ExtraBold, color = DarkRed) }
+                            items(savedCards, key = { "single-${it.id}" }) { ticket ->
                                 Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-                                    Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(
                                             checked = ticket.id in selectedSavedIds,
                                             onCheckedChange = { checked ->
-                                                if (checked && selectedSavedIds.size < MAX_ACTIVE) selectedSavedIds.add(ticket.id)
+                                                if (checked && selectedCount < MAX_ACTIVE) selectedSavedIds.add(ticket.id)
                                                 if (!checked) selectedSavedIds.remove(ticket.id)
                                             },
-                                            enabled = ticket.id in selectedSavedIds || selectedSavedIds.size < MAX_ACTIVE
+                                            enabled = ticket.id in selectedSavedIds || selectedCount < MAX_ACTIVE
                                         )
                                         Column(Modifier.weight(1f)) {
                                             Text(ticket.name, fontWeight = FontWeight.Bold)
@@ -379,20 +437,42 @@ private fun MiBingoApp() {
                                 }
                             }
                         }
-                        if (savedCards.isEmpty()) Text("Todavía no has guardado cartones propios.")
+                        if (ticketPackages.isEmpty() && savedCards.isEmpty()) Text("Todavía no has guardado cartones ni paquetes.")
                         Button(
                             onClick = {
                                 activeIds.clear()
-                                selectedSavedIds.take(MAX_ACTIVE).forEach { activeIds.add(it) }
+                                selectedSavedIds.forEach { id ->
+                                    if (activeIds.size < MAX_ACTIVE && id !in activeIds) activeIds.add(id)
+                                }
+                                selectedPackageTicketKeys.toList().forEach { key ->
+                                    if (activeIds.size < MAX_ACTIVE) {
+                                        val parts = key.split(":")
+                                        val pkgId = parts.getOrNull(0)?.toLongOrNull()
+                                        val ticketIndex = parts.getOrNull(1)?.toIntOrNull()
+                                        val pkg = ticketPackages.firstOrNull { it.id == pkgId }
+                                        val source = pkg?.tickets?.getOrNull(ticketIndex ?: -1)
+                                        if (source != null) {
+                                            val copy = source.copy(
+                                                id = nextTicketId(cards),
+                                                name = "${pkg.name} - ${source.name}",
+                                                marked = emptySet()
+                                            )
+                                            cards.add(copy)
+                                            activeIds.add(copy.id)
+                                        }
+                                    }
+                                }
                                 cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
                                 saveCards(ctx, cards)
                                 persistActive()
+                                selectedSavedIds.clear()
+                                selectedPackageTicketKeys.clear()
                                 page = "game"
                                 (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             },
-                            enabled = selectedSavedIds.isNotEmpty(),
+                            enabled = selectedCount in 1..MAX_ACTIVE,
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Jugar (${selectedSavedIds.size}/6)") }
+                        ) { Text("Jugar con $selectedCount cartones") }
                         BigButton("+", "Crear nuevo cartón", "", Blue) {
                             nameInput = ""
                             numbersInput = ""
@@ -428,10 +508,49 @@ private fun MiBingoApp() {
                 }
             } }, confirmButton = { TextButton(onClick = { editingCell = -1 }) { Text("Cerrar") } })
     }
+    if (showSavePackageDialog) AlertDialog(
+        onDismissRequest = { showSavePackageDialog = false },
+        title = { Text("Guardar paquete") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Se guardarán copias independientes de los ${activeIds.size} cartones de esta partida.")
+                OutlinedTextField(
+                    value = packageNameInput,
+                    onValueChange = { packageNameInput = it },
+                    label = { Text("Nombre del paquete") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val selected = cards.filter { it.id in activeIds }.mapIndexed { index, ticket ->
+                    ticket.copy(id = index.toLong() + 1L, name = "Cartón ${index + 1}", marked = emptySet(), grid = ticket.grid.map { it.toList() })
+                }
+                if (selected.isNotEmpty() && packageNameInput.isNotBlank()) {
+                    ticketPackages.add(TicketPackage(System.currentTimeMillis(), packageNameInput.trim(), selected))
+                    saveTicketPackages(ctx, ticketPackages)
+                    message = "Paquete «${packageNameInput.trim()}» guardado."
+                }
+                showSavePackageDialog = false
+            }, enabled = packageNameInput.isNotBlank() && activeIds.isNotEmpty()) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = { showSavePackageDialog = false }) { Text("Cancelar") } }
+    )
     if (options) AlertDialog(
         onDismissRequest = { options = false },
         title = { Text("Opciones", fontWeight = FontWeight.Bold) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(
+                onClick = {
+                    showSavePackageDialog = true
+                    packageNameInput = ""
+                    options = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(8.dp)
+            ) { Text("📦 Guardar como paquete") }
             TextButton(
                 onClick = {
                     val added = saveActiveCardsToLibrary()
@@ -639,6 +758,43 @@ private fun loadSavedSeries(ctx: Context): List<List<Ticket>> {
                 }
                 Ticket(o.getLong("id"), o.getString("name"), grid)
             }
+        }
+    } catch (_: Exception) { emptyList() }
+}
+private fun saveTicketPackages(ctx: Context, packages: List<TicketPackage>) {
+    val outer = JSONArray()
+    packages.forEach { pkg ->
+        val obj = JSONObject().put("id", pkg.id).put("name", pkg.name)
+        val arr = JSONArray()
+        pkg.tickets.forEach { ticket ->
+            val item = JSONObject().put("id", ticket.id).put("name", ticket.name)
+            val rows = JSONArray()
+            ticket.grid.forEach { rows.put(JSONArray(it)) }
+            item.put("grid", rows).put("marked", JSONArray())
+            arr.put(item)
+        }
+        obj.put("tickets", arr)
+        outer.put(obj)
+    }
+    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("ticketPackages", outer.toString()).apply()
+}
+private fun loadTicketPackages(ctx: Context): List<TicketPackage> {
+    val saved = ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).getString("ticketPackages", null) ?: return emptyList()
+    return try {
+        val outer = JSONArray(saved)
+        (0 until outer.length()).map { pi ->
+            val obj = outer.getJSONObject(pi)
+            val arr = obj.getJSONArray("tickets")
+            val tickets = (0 until arr.length()).map { ti ->
+                val item = arr.getJSONObject(ti)
+                val rows = item.getJSONArray("grid")
+                val grid = (0 until rows.length()).map { r ->
+                    val row = rows.getJSONArray(r)
+                    (0 until row.length()).map { c -> row.getInt(c) }
+                }
+                Ticket(item.optLong("id", ti.toLong()), item.getString("name"), grid)
+            }
+            TicketPackage(obj.getLong("id"), obj.getString("name"), tickets)
         }
     } catch (_: Exception) { emptyList() }
 }
