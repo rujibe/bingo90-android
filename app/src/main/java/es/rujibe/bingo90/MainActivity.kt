@@ -537,7 +537,7 @@ private fun MiBingoApp() {
                         }
                     }
                 }
-                else -> HomePage(onChoose = { page = "choose" }, onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
+                else -> HomePage(onChoose = { page = "choose" }, onResume = { page = "game" }, showResume = activeIds.isNotEmpty(), onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
             }
         }
     }
