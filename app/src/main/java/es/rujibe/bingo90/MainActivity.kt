@@ -61,6 +61,8 @@ private fun MiBingoApp() {
     var numbersInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
+    var editorGrid by remember { mutableStateOf(List(3) { List(9) { 0 } }) }
+    var editingCell by remember { mutableIntStateOf(-1) }
     val selectedSavedIds = remember { mutableStateListOf<Long>() }
 
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
@@ -112,7 +114,7 @@ private fun MiBingoApp() {
                 "home" -> HomePage(
                     onChoose = { page = "choose" },
                     onRandom = { page = "random" },
-                    onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; page = "create" },
+                    onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; editorGrid = List(3) { List(9) { 0 } }; page = "create" },
                     onSaved = { page = "saved" }
                 )
                 "choose" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -163,30 +165,41 @@ private fun MiBingoApp() {
                         }
                     }
                 }
-                "create" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                "create" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Nombre del cartón:", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Ejemplo: Mi cartón favorito") }, singleLine = true)
-                    Text("Escribe 15 números distintos del 1 al 90, separados por comas.", style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(value = numbersInput, onValueChange = { numbersInput = it; message = "" }, modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), placeholder = { Text("6, 10, 23, 35, 46, 53...") })
-                    if (message.isNotBlank()) Text(message, color = Red)
-                    BigButton("🎲", "Generar cartón", "Crear números automáticamente", Blue) { numbersInput = generateGrid().flatten().filter { it > 0 }.joinToString(", "); message = "Puedes guardar este cartón o editar sus números." }
-                    BigButton("✎", "Guardar cartón", "Guardar permanentemente en el móvil", Green) {
-                        val parts = numbersInput.split(Regex("[,;\\s]+")).filter { it.isNotBlank() }
-                        val nums = parts.mapNotNull { it.toIntOrNull() }
-                        val grid = if (parts.size == 15 && nums.size == 15) makeGrid(nums) else null
-                        if (grid == null) message = "Revisa los 15 números: deben ser únicos y válidos para un cartón de bingo."
-                        else {
-                            val ticket = Ticket(editingId ?: nextTicketId(cards), nameInput.ifBlank { "Mi cartón ${cards.size + 1}" }, grid)
-                            if (editingId != null) { val i = cards.indexOfFirst { it.id == editingId }; if (i >= 0) cards[i] = ticket else cards.add(ticket) } else cards.add(ticket)
-                            saveCards(ctx, cards)
-                            message = "¡Cartón guardado!"
+                    OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Mi cartón favorito") }, singleLine = true)
+                    Text("Toca una casilla para elegir el número. Debe haber 15 números y 5 por fila.", style = MaterialTheme.typography.bodySmall)
+                    Column(Modifier.fillMaxWidth().border(2.dp, Blue, RoundedCornerShape(5.dp)).background(Color.White).padding(2.dp)) {
+                        for (r in 0..2) Row(Modifier.fillMaxWidth()) {
+                            for (c in 0..8) {
+                                val n = editorGrid[r][c]
+                                Box(Modifier.weight(1f).aspectRatio(.78f).padding(.5.dp).clip(RoundedCornerShape(3.dp)).background(if (n > 0) Color(0xFFEAF3FF) else Color(0xFFF8FAFC)).border(1.dp, if (n > 0) Blue else Color(0xFFB8C9DD), RoundedCornerShape(3.dp)).clickable { editingCell = r * 9 + c }, contentAlignment = Alignment.Center) {
+                                    Text(if (n > 0) n.toString() else "·", color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                }
+                            }
                         }
                     }
-                    InfoPanel("Tus cartones se guardan en el móvil para usarlos en futuras partidas.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { editorGrid = List(3) { List(9) { 0 } }; message = "" }, modifier = Modifier.weight(1f)) { Text("Vaciar") }
+                        Button(onClick = { editorGrid = generateGrid(); message = "Cartón aleatorio creado; puedes editarlo." }, modifier = Modifier.weight(1f)) { Text("Aleatorio") }
+                    }
+                    if (message.isNotBlank()) Text(message, color = if (message.startsWith("¡Cartón")) Green else Red)
+                    Button(onClick = {
+                        val nums = editorGrid.flatten().filter { it > 0 }
+                        val valid = nums.size == 15 && nums.distinct().size == 15 && (0..2).all { r -> editorGrid[r].count { it > 0 } == 5 } &&
+                            (0..8).all { c -> (0..2).map { r -> editorGrid[r][c] }.filter { it > 0 }.all { n -> n in (if (c == 0) 1 else c * 10)..(if (c == 8) 90 else c * 10 + 9) } }
+                        if (!valid) message = "Completa 15 números únicos, 5 por fila y en la columna correcta."
+                        else {
+                            val ticket = Ticket(editingId ?: nextTicketId(cards), nameInput.ifBlank { "Mi cartón ${cards.count { it.id !in (1L..1000L) } + 1}" }, editorGrid.map { it.toList() })
+                            if (editingId != null) { val i = cards.indexOfFirst { it.id == editingId }; if (i >= 0) cards[i] = ticket else cards.add(ticket) } else cards.add(ticket)
+                            saveCards(ctx, cards); message = "¡Cartón guardado correctamente!"; editingId = ticket.id
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Guardar cartón") }
+                    InfoPanel("Los cartones se guardan en este móvil para futuras partidas sin conexión.")
                 }
                 "saved" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Elige hasta 6 cartones guardados", fontWeight = FontWeight.Bold)
-                    cards.filter { it.name.startsWith("Mi cartón") || it.name.startsWith("Mi ") }.forEach { ticket ->
+                    cards.filter { it.id !in (1L..1000L) }.forEach { ticket ->
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = ticket.id in selectedSavedIds, onCheckedChange = { checked ->
@@ -194,24 +207,44 @@ private fun MiBingoApp() {
                                     if (!checked) selectedSavedIds.remove(ticket.id)
                                 }, enabled = ticket.id in selectedSavedIds || selectedSavedIds.size < MAX_ACTIVE)
                                 Column(Modifier.weight(1f)) { Text(ticket.name, fontWeight = FontWeight.Bold); Text("Cartón guardado", style = MaterialTheme.typography.bodySmall) }
-                                TextButton(onClick = { nameInput = ticket.name; numbersInput = ticket.grid.flatten().filter { it > 0 }.joinToString(", "); editingId = ticket.id; page = "create" }) { Text("Editar") }
+                                TextButton(onClick = { nameInput = ticket.name; numbersInput = ""; editorGrid = ticket.grid.map { it.toList() }; editingId = ticket.id; message = ""; page = "create" }) { Text("Editar") }
                             }
                         }
                     }
-                    if (cards.none { it.name.startsWith("Mi cartón") || it.name.startsWith("Mi ") }) Text("Todavía no has guardado cartones propios.")
+                    if (cards.none { it.id !in (1L..1000L) }) Text("Todavía no has guardado cartones propios.")
                     Button(onClick = {
                         activeIds.clear()
                         selectedSavedIds.take(MAX_ACTIVE).forEach { activeIds.add(it) }
                         cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
                         saveCards(ctx, cards); persistActive(); page = "game"
                     }, enabled = selectedSavedIds.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Jugar (${selectedSavedIds.size}/6)") }
-                    BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editingId = null; page = "create" }
+                    BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editorGrid = List(3) { List(9) { 0 } }; editingId = null; message = ""; page = "create" }
                 }
                 else -> HomePage(onChoose = { page = "choose" }, onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
             }
         }
     }
 
+
+    if (editingCell >= 0 && page == "create") {
+        val row = editingCell / 9
+        val col = editingCell % 9
+        val low = if (col == 0) 1 else col * 10
+        val high = if (col == 8) 90 else col * 10 + 9
+        val existing = editorGrid.flatten().filter { it > 0 && it != editorGrid[row][col] }.toSet()
+        AlertDialog(onDismissRequest = { editingCell = -1 }, title = { Text("Elige número ($low–$high)") },
+            text = { Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                TextButton(onClick = { editorGrid = editorGrid.mapIndexed { r, rowValues -> rowValues.mapIndexed { c, v -> if (r == row && c == col) 0 else v } }; editingCell = -1 }) { Text("Vaciar casilla") }
+                (low..high).chunked(5).forEach { group ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        group.forEach { number ->
+                            TextButton(onClick = { if (number !in existing) editorGrid = editorGrid.mapIndexed { r, rowValues -> rowValues.mapIndexed { c, v -> if (r == row && c == col) number else v } }; editingCell = -1 }, enabled = number !in existing, modifier = Modifier.weight(1f)) { Text(number.toString()) }
+                        }
+                        repeat(5-group.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            } }, confirmButton = { TextButton(onClick = { editingCell = -1 }) { Text("Cerrar") } })
+    }
     if (options) AlertDialog(
         onDismissRequest = { options = false },
         title = { Text("Opciones", fontWeight = FontWeight.Bold) },
