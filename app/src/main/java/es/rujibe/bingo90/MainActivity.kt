@@ -348,7 +348,6 @@ private fun InfoPanel(text: String) {
 }
 
 @Composable
-@Composable
 private fun TicketPreviewGrid(grid: List<List<Int>>) {
     Column(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(3.dp)).padding(1.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
         for (r in 0..2) {
@@ -369,6 +368,7 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
     }
 }
 
+@Composable
 private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.padding(if (compact) 2.dp else 5.dp)) {
