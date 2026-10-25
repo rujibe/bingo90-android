@@ -191,6 +191,30 @@ private fun MiBingoApp() {
                         }
                     }
                     if (cards.none { it.name.startsWith("Mi cartón") || it.name.startsWith("Mi ") }) Text("Todavía no has guardado cartones propios.")
+                    val savedSeries = loadSavedSeries(ctx)
+                    if (savedSeries.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Series guardadas", fontWeight = FontWeight.Bold)
+                        savedSeries.forEachIndexed { seriesIndex, series ->
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
+                                Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Serie guardada ${seriesIndex + 1}", fontWeight = FontWeight.Bold)
+                                        Text("${series.size} cartones", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    TextButton(onClick = {
+                                        activeIds.clear()
+                                        series.take(count).forEach { ticket ->
+                                            val existing = cards.firstOrNull { it.id == ticket.id }
+                                            if (existing == null) cards.add(ticket.copy(marked = emptySet()))
+                                            if (activeIds.size < count) activeIds.add(ticket.id)
+                                        }
+                                        saveCards(ctx, cards); persistActive(); page = "game"
+                                    }) { Text("Usar serie") }
+                                }
+                            }
+                        }
+                    }
                     BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editingId = null; page = "create" }
                 }
                 else -> HomePage(onChoose = { page = "choose" }, onRandom = { startGame("random") }, onCount = { page = "count" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
@@ -317,9 +341,37 @@ private fun saveCards(ctx: Context, cards: List<Ticket>) {
     ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("cards", arr.toString()).apply()
 }
 private fun saveSeries(ctx: Context, cards: List<Ticket>) {
-    val arr = JSONArray()
-    cards.forEach { t -> val o = JSONObject().put("id", t.id).put("name", t.name); val rows = JSONArray(); t.grid.forEach { rows.put(JSONArray(it)) }; o.put("grid", rows).put("marked", JSONArray()); arr.put(o) }
-    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("savedSeries", arr.toString()).apply()
+    val all = loadSavedSeries(ctx).toMutableList()
+    all.add(cards.map { it.copy(marked = emptySet()) })
+    val outer = JSONArray()
+    all.forEach { series ->
+        val arr = JSONArray()
+        series.forEach { t ->
+            val o = JSONObject().put("id", t.id).put("name", t.name)
+            val rows = JSONArray(); t.grid.forEach { rows.put(JSONArray(it)) }
+            o.put("grid", rows).put("marked", JSONArray()); arr.put(o)
+        }
+        outer.put(arr)
+    }
+    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("savedSeries", outer.toString()).apply()
+}
+private fun loadSavedSeries(ctx: Context): List<List<Ticket>> {
+    val saved = ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).getString("savedSeries", null) ?: return emptyList()
+    return try {
+        val outer = JSONArray(saved)
+        (0 until outer.length()).map { si ->
+            val arr = outer.getJSONArray(si)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val rows = o.getJSONArray("grid")
+                val grid = (0 until rows.length()).map { r ->
+                    val row = rows.getJSONArray(r)
+                    (0 until row.length()).map { c -> row.getInt(c) }
+                }
+                Ticket(o.getLong("id"), o.getString("name"), grid)
+            }
+        }
+    } catch (_: Exception) { emptyList() }
 }
 private fun generateSeries(): List<List<List<Int>>> {
     while (true) {
