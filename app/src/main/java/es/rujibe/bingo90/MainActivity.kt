@@ -2,6 +2,7 @@ package es.rujibe.bingo90
 
 import android.content.Context
 import android.os.Bundle
+import android.content.pm.ActivityInfo
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -64,6 +65,8 @@ private fun MiBingoApp() {
     var editorGrid by remember { mutableStateOf(List(3) { List(9) { 0 } }) }
     var editingCell by remember { mutableIntStateOf(-1) }
     val selectedSavedIds = remember { mutableStateListOf<Long>() }
+    val selectedChooseIds = remember { mutableStateListOf<Long>() }
+    var chooseSearch by remember { mutableStateOf("") }
 
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
     fun addTicket(ticket: Ticket) {
@@ -74,13 +77,13 @@ private fun MiBingoApp() {
         pendingMode = mode
         activeIds.clear()
         if (mode == "series") {
-            val start = Random.nextInt(0, (cards.size / 6).coerceAtLeast(1)) * 6
-            cards.drop(start).take(6).take(count).forEach { activeIds.add(it.id) }
+            selectedChooseIds.take(count).forEach { activeIds.add(it) }
+            if (activeIds.isEmpty()) cards.shuffled().take(count).forEach { activeIds.add(it.id) }
         } else {
-            val seriesCount = (cards.size / 6).coerceAtLeast(1)
-            val seriesStart = Random.nextInt(seriesCount) * 6
-            cards.drop(seriesStart).take(6).shuffled().take(count).forEach { activeIds.add(it.id) }
+            cards.shuffled().take(count).forEach { activeIds.add(it.id) }
         }
+        (ctx as? ComponentActivity)?.requestedOrientation =
+            if (activeIds.size > 3) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         if (activeIds.isEmpty()) {
             val t = Ticket(nextTicketId(cards), "Cartón 1", generateGrid())
             cards.add(t); saveCards(ctx, cards); activeIds.add(t.id)
@@ -117,17 +120,29 @@ private fun MiBingoApp() {
                     onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; editorGrid = List(3) { List(9) { 0 } }; page = "create" },
                     onSaved = { page = "saved" }
                 )
-                "choose" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("¿Cuántos cartones quieres jugar?", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                "choose" -> Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Elige hasta 6 de los 1.000 cartones disponibles (${selectedChooseIds.size}/${count} seleccionados)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         (1..6).forEach { n ->
-                            Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (count == n) Blue else Color.White).border(1.dp, Blue, RoundedCornerShape(8.dp)).clickable { count = n }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
-                                Text("$n", color = if (count == n) Color.White else Blue, fontWeight = FontWeight.Bold)
+                            Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (count == n) Blue else Color.White).border(1.dp, Blue, RoundedCornerShape(8.dp)).clickable { count = n; while (selectedChooseIds.size > n) selectedChooseIds.removeAt(selectedChooseIds.lastIndex) }.padding(vertical = 7.dp), contentAlignment = Alignment.Center) {
+                                Text("$" + "{n}", color = if (count == n) Color.White else Blue, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                    BigButton("▦", "Elegir cartones", "Jugar con $count cartones de una serie", Blue) { startGame("series") }
-                    InfoPanel("Hay 1.000 cartones disponibles, organizados en series de 6.")
+                    OutlinedTextField(value = chooseSearch, onValueChange = { chooseSearch = it.filter { ch -> ch.isDigit() } }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Buscar por número de cartón (1–1000)") })
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        cards.filter { it.id in 1L..1000L && (chooseSearch.isBlank() || it.name.filter { ch -> ch.isDigit() }.contains(chooseSearch)) }.forEach { ticket ->
+                            Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = ticket.id in selectedChooseIds, onCheckedChange = { checked ->
+                                    if (checked && selectedChooseIds.size < count) selectedChooseIds.add(ticket.id)
+                                    if (!checked) selectedChooseIds.remove(ticket.id)
+                                }, enabled = ticket.id in selectedChooseIds || selectedChooseIds.size < count)
+                                Text(ticket.name, Modifier.weight(1f), color = Blue, fontWeight = FontWeight.SemiBold)
+                                Text(ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(" "), style = MaterialTheme.typography.labelSmall, color = Color.DarkGray, maxLines = 1)
+                            }
+                        }
+                    }
+                    Button(onClick = { startGame("series") }, enabled = selectedChooseIds.size == count, modifier = Modifier.fillMaxWidth()) { Text("Jugar con ${selectedChooseIds.size} cartones seleccionados") }
                 }
                 "random" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("¿Cuántos cartones aleatorios quieres?", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -140,28 +155,52 @@ private fun MiBingoApp() {
                     }
                     BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
-                "game" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 5.dp)) {
+                "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 2.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Cartones en la partida: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                        TextButton(onClick = { options = true }) { Text("Opciones") }
-                        TextButton(onClick = {
-                            cards.filter { it.id in activeIds }.let { saveSeries(ctx, it) }
-                            message = "Serie guardada en este móvil."
-                        }) { Text("Guardar serie") }
+                        Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                        TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
+                        TextButton(onClick = { cards.filter { it.id in activeIds }.let { saveSeries(ctx, it) }; message = "Serie guardada en este móvil." }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
                     }
-                    if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.bodySmall)
-                    activeIds.toList().forEachIndexed { index, id ->
-                        val i = cards.indexOfFirst { it.id == id }
-                        if (i >= 0) {
-                            val ticket = cards[i]
-                            TicketPanel(ticket, index + 1, compact = activeIds.size >= 4, onToggle = { n ->
-                                val j = cards.indexOfFirst { it.id == id }
-                                if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                            }, onClear = {
-                                val j = cards.indexOfFirst { it.id == id }
-                                if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                            }, onRemove = { activeIds.remove(id); persistActive() })
-                            Spacer(Modifier.height(6.dp))
+                    if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    if (activeIds.size > 3) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            (0..1).forEach { side ->
+                                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    activeIds.toList().withIndex().filter { it.index % 2 == side }.forEach { indexed ->
+                                        val id = indexed.value
+                                        val i = cards.indexOfFirst { it.id == id }
+                                        if (i >= 0) {
+                                            val ticket = cards[i]
+                                            Box(Modifier.weight(1f).fillMaxWidth()) {
+                                                TicketPanel(ticket, indexed.index + 1, compact = true, onToggle = { n ->
+                                                    val j = cards.indexOfFirst { it.id == id }
+                                                    if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                                }, onClear = {
+                                                    val j = cards.indexOfFirst { it.id == id }
+                                                    if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                                }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 3) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                            activeIds.toList().forEachIndexed { index, id ->
+                                val i = cards.indexOfFirst { it.id == id }
+                                if (i >= 0) {
+                                    val ticket = cards[i]
+                                    TicketPanel(ticket, index + 1, compact = false, onToggle = { n ->
+                                        val j = cards.indexOfFirst { it.id == id }
+                                        if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                    }, onClear = {
+                                        val j = cards.indexOfFirst { it.id == id }
+                                        if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                    }, onRemove = { activeIds.remove(id); persistActive() })
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
                         }
                     }
                 }
@@ -346,11 +385,21 @@ private fun loadCards(ctx: Context): List<Ticket> {
         if (out.isNotEmpty()) return out
     } catch (_: Exception) {}
     val initial = mutableListOf<Ticket>()
+    val signatures = mutableSetOf<String>()
     while (initial.size + 6 <= 1000) {
         val series = generateSeries()
-        series.forEach { grid -> initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", grid)) }
+        val uniqueSeries = series.map { grid -> grid to grid.flatten().filter { it > 0 }.sorted().joinToString(",") }
+        if (uniqueSeries.any { it.second in signatures } || uniqueSeries.map { it.second }.distinct().size != 6) continue
+        uniqueSeries.forEach { (grid, signature) ->
+            signatures.add(signature)
+            initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", grid))
+        }
     }
-    while (initial.size < 1000) initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", generateGrid()))
+    while (initial.size < 1000) {
+        val grid = generateGrid()
+        val signature = grid.flatten().filter { it > 0 }.sorted().joinToString(",")
+        if (signatures.add(signature)) initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", grid))
+    }
     saveCards(ctx, initial); return initial
 }
 private fun saveCards(ctx: Context, cards: List<Ticket>) {
