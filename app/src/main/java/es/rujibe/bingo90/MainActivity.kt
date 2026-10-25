@@ -114,15 +114,8 @@ private fun MiBingoApp() {
                     onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; page = "create" },
                     onSaved = { page = "saved" }
                 )
-                "choose" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Selecciona cómo quieres obtener tus cartones:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    BigButton("▦", "Cartones de la serie", "($count cartones)", Blue) { startGame("series") }
-                    BigButton("🎲", "Selección aleatoria", "($count cartones)", Green) { startGame("random") }
-                    BigButton("123", "Elegir número de cartones", "(1 a 6 · actual: $count)", Purple) { page = "count" }
-                    InfoPanel("Los cartones se eligen de la misma serie. Hay 1.000 cartones disponibles, organizados en series de 6.")
-                }
-                "count" -> Column(Modifier.fillMaxSize().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Text("¿Cuántos cartones quieres?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                "choose" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("¿Cuántos cartones quieres jugar?", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (1..6).forEach { n ->
                             Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (count == n) Blue else Color.White).border(1.dp, Blue, RoundedCornerShape(8.dp)).clickable { count = n }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
@@ -130,7 +123,19 @@ private fun MiBingoApp() {
                             }
                         }
                     }
-                    BigButton("✓", "Guardar cantidad", "$count cartones por partida", Green) { page = "choose" }
+                    BigButton("▦", "Elegir cartones", "Jugar con $count cartones de una serie", Blue) { startGame("series") }
+                    InfoPanel("Hay 1.000 cartones disponibles, organizados en series de 6.")
+                }
+                "random" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("¿Cuántos cartones aleatorios quieres?", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (1..6).forEach { n ->
+                            Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (count == n) Green else Color.White).border(1.dp, Green, RoundedCornerShape(8.dp)).clickable { count = n }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
+                                Text("$n", color = if (count == n) Color.White else Green, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
                 "game" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 5.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
