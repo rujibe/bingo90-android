@@ -82,6 +82,7 @@ private fun MiBingoApp() {
     var count by remember { mutableIntStateOf(6) }
     var pendingMode by remember { mutableStateOf("series") }
     var options by remember { mutableStateOf(false) }
+    var confirmClearMarks by remember { mutableStateOf(false) }
     var canUndoMarks by remember { mutableStateOf(hasMarksSnapshot(ctx)) }
     var nameInput by remember { mutableStateOf("") }
     var numbersInput by remember { mutableStateOf("") }
@@ -691,7 +692,7 @@ private fun MiBingoApp() {
             HorizontalDivider()
             Text("¿Desea jugar con los mismos cartones?", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { snapshotMarks(); cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }; saveCards(ctx, cards); options = false; message = "Marcas borradas. ¡Nueva partida!" }, modifier = Modifier.weight(1f)) { Text("Sí") }
+                Button(onClick = { confirmClearMarks = true }, modifier = Modifier.weight(1f)) { Text("Sí") }
                 OutlinedButton(onClick = { options = false; page = "home" }, modifier = Modifier.weight(1f)) { Text("No") }
             }
             HorizontalDivider()
@@ -706,6 +707,20 @@ private fun MiBingoApp() {
             ) { Text("✖ Volver al menú principal") }
         } },
         confirmButton = { TextButton(onClick = { options = false }) { Text("Cerrar") } }
+    )
+    if (confirmClearMarks) AlertDialog(
+        onDismissRequest = { confirmClearMarks = false },
+        title = { Text("¿Borrar las marcas?") },
+        text = { Text("Se quitarán todos los números marcados de los cartones activos. Podrás recuperarlos con Deshacer.") },
+        confirmButton = { TextButton(onClick = {
+            snapshotMarks()
+            cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
+            saveCards(ctx, cards)
+            confirmClearMarks = false
+            options = false
+            message = "Marcas borradas. ¡Nueva partida!"
+        }) { Text("Borrar marcas") } },
+        dismissButton = { TextButton(onClick = { confirmClearMarks = false }) { Text("Cancelar") } }
     )
 }
 
