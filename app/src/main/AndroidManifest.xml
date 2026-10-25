@@ -3,7 +3,7 @@
         android:icon="@drawable/ic_mi_bingo"
         android:roundIcon="@drawable/ic_mi_bingo"
         android:allowBackup="true"
-        android:label="Mi Bingo"
+        android:label="Mis Cartones"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
         <activity
