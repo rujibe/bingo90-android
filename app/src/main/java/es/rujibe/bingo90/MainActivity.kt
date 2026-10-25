@@ -171,7 +171,19 @@ private fun MiBingoApp() {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                         TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
-                        TextButton(onClick = { cards.filter { it.id in activeIds }.let { saveSeries(ctx, it) }; message = "Serie guardada en este móvil." }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
+                        TextButton(onClick = {
+                            val toSave = cards.filter { it.id in activeIds }
+                            toSave.forEach { ticket ->
+                                val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
+                                val alreadySaved = cards.any { it.id !in (1L..1000L) && it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",") == signature }
+                                if (ticket.id in 1L..1000L && !alreadySaved) {
+                                    cards.add(ticket.copy(id = nextTicketId(cards), name = "Guardado - " + ticket.name, marked = emptySet()))
+                                }
+                            }
+                            saveSeries(ctx, toSave)
+                            saveCards(ctx, cards)
+                            message = "Cartones guardados. Puedes guardar más cuando quieras."
+                        }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
                     }
                     if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     if (activeIds.size > 3) {
@@ -385,7 +397,7 @@ private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false,
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
-                        Box(Modifier.weight(1f).aspectRatio(if (compact) 2.4f else 1.15f).padding(if (compact) .2.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(.45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).aspectRatio(if (compact) 1.05f else 1.15f).padding(if (compact) .2.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(.45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
                             if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
                     }
