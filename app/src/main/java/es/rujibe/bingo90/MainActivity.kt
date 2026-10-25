@@ -125,7 +125,23 @@ private fun MiBingoApp() {
             selectedChooseIds.take(count).forEach { activeIds.add(it) }
             if (activeIds.isEmpty()) cards.shuffled().take(count).forEach { activeIds.add(it.id) }
         } else {
-            cards.shuffled().take(count).forEach { activeIds.add(it.id) }
+            // Random play takes tickets from one complete 6-ticket strip.
+            // Tickets in a strip partition 1..90, so numbers never repeat between them.
+            val strips = cards
+                .filter { it.id in 1L..1000L }
+                .groupBy { (it.id - 1L) / 6L }
+                .values
+                .filter { it.size == 6 }
+            val strip = strips.randomOrNull()
+            if (strip != null) {
+                strip.shuffled().take(count).forEach { activeIds.add(it.id) }
+            } else {
+                generateSeries().take(count).forEachIndexed { index, grid ->
+                    val ticket = Ticket(nextTicketId(cards), "Aleatorio ${index + 1}", grid)
+                    cards.add(ticket)
+                    activeIds.add(ticket.id)
+                }
+            }
         }
         if (activeIds.isEmpty()) {
             val t = Ticket(nextTicketId(cards), "Cartón 1", generateGrid())
@@ -215,7 +231,7 @@ private fun MiBingoApp() {
                     Column(
                         Modifier.fillMaxSize()
                             .padding(horizontal = 2.dp, vertical = 1.dp)
-                            .then(if (compactSix) Modifier.padding(end = 58.dp) else Modifier)
+                            .then(if (compactSix) Modifier.padding(start = 58.dp) else Modifier)
                     ) {
                     if (compactSix) {
                         Spacer(Modifier.height(1.dp))
@@ -230,69 +246,95 @@ private fun MiBingoApp() {
                         }
                         if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
-                    if (activeIds.size > 3) {
-                        if (landscape && activeIds.size > 4) {
-                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                activeIds.take(6).toList().chunked(2).forEach { rowIds ->
-                                    Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        rowIds.forEach { id ->
-                                            val ticketIndex = cards.indexOfFirst { it.id == id }
-                                            if (ticketIndex >= 0) {
-                                                val ticket = cards[ticketIndex]
-                                                TicketPanel(ticket, activeIds.indexOf(id) + 1, compact = true, modifier = Modifier.weight(1f).fillMaxHeight(), onToggle = { n ->
+                    val portraitTicketHeight = when (activeIds.size) {
+                        1 -> 142.dp
+                        2 -> 126.dp
+                        3 -> 112.dp
+                        else -> 100.dp
+                    }
+                    if (compactSix) {
+                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            activeIds.take(6).toList().chunked(2).forEach { rowIds ->
+                                Row(
+                                    Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowIds.forEach { id ->
+                                        val ticketIndex = cards.indexOfFirst { it.id == id }
+                                        if (ticketIndex >= 0) {
+                                            val ticket = cards[ticketIndex]
+                                            TicketPanel(
+                                                ticket,
+                                                activeIds.indexOf(id) + 1,
+                                                compact = true,
+                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                onToggle = { n ->
                                                     val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                                }, onClear = {
+                                                    if (j >= 0) {
+                                                        val old = cards[j]
+                                                        cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)
+                                                        saveCards(ctx, cards)
+                                                    }
+                                                },
+                                                onClear = {
                                                     val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                                }, onRemove = {
-                                                    activeIds.remove(id); persistActive()
+                                                    if (j >= 0) {
+                                                        cards[j] = cards[j].copy(marked = emptySet())
+                                                        saveCards(ctx, cards)
+                                                    }
+                                                },
+                                                onRemove = {
+                                                    activeIds.remove(id)
+                                                    persistActive()
                                                     if (activeIds.size <= 4) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                                })
-                                            }
+                                                }
+                                            )
                                         }
-                                        if (rowIds.size == 1) Spacer(Modifier.weight(1f))
                                     }
-                                }
-                            }                        } else {
-                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                activeIds.take(4).toList().forEachIndexed { index, id ->
-                                    val ticketIndex = cards.indexOfFirst { it.id == id }
-                                    if (ticketIndex >= 0) {
-                                        val ticket = cards[ticketIndex]
-                                        TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxWidth(), onToggle = { n ->
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                        }, onClear = {
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                        }, onRemove = { activeIds.remove(id); persistActive() })
-                                    }
+                                    if (rowIds.size == 1) Spacer(Modifier.weight(1f))
                                 }
                             }
                         }
                     } else {
-                        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                            activeIds.toList().forEachIndexed { index, id ->
-                                val i = cards.indexOfFirst { it.id == id }
-                                if (i >= 0) {
-                                    val ticket = cards[i]
-                                    TicketPanel(ticket, index + 1, compact = false, onToggle = { n ->
-                                        val j = cards.indexOfFirst { it.id == id }
-                                        if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                    }, onClear = {
-                                        val j = cards.indexOfFirst { it.id == id }
-                                        if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                    }, onRemove = { activeIds.remove(id); persistActive() })
-                                    Spacer(Modifier.height(6.dp))
+                        Column(
+                            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            activeIds.take(4).toList().forEachIndexed { index, id ->
+                                val ticketIndex = cards.indexOfFirst { it.id == id }
+                                if (ticketIndex >= 0) {
+                                    val ticket = cards[ticketIndex]
+                                    TicketPanel(
+                                        ticket,
+                                        index + 1,
+                                        compact = true,
+                                        modifier = Modifier.fillMaxWidth().height(portraitTicketHeight),
+                                        onToggle = { n ->
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) {
+                                                val old = cards[j]
+                                                cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)
+                                                saveCards(ctx, cards)
+                                            }
+                                        },
+                                        onClear = {
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) {
+                                                cards[j] = cards[j].copy(marked = emptySet())
+                                                saveCards(ctx, cards)
+                                            }
+                                        },
+                                        onRemove = { activeIds.remove(id); persistActive() }
+                                    )
                                 }
                             }
                         }
                     }
                     }
+                    }
                     if (compactSix) {
                         Column(
-                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(56.dp)
+                            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(56.dp)
                                 .padding(vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
                             horizontalAlignment = Alignment.CenterHorizontally
