@@ -28,7 +28,19 @@ private data class Ticket(val id: Long, val name: String, val grid: List<List<In
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { BingoScreen() } }
+        setContent {
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = androidx.compose.ui.graphics.Color(0xFF0759D5),
+                    onPrimary = androidx.compose.ui.graphics.Color.White,
+                    secondary = androidx.compose.ui.graphics.Color(0xFFFFD928),
+                    background = androidx.compose.ui.graphics.Color(0xFFFFE987),
+                    surface = androidx.compose.ui.graphics.Color(0xFFFFF7D0),
+                    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFDDE9FF),
+                    error = androidx.compose.ui.graphics.Color(0xFFB00020)
+                )
+            ) { BingoScreen() }
+        }
     }
 }
 
@@ -59,8 +71,8 @@ private fun BingoScreen() {
     Scaffold(topBar = {
         CenterAlignedTopAppBar(title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Bingo 90", fontWeight = FontWeight.Bold)
-                Text("Hasta 6 cartones · sin sacar bolas", style = MaterialTheme.typography.labelSmall)
+                Text("BINGO 90", fontWeight = FontWeight.ExtraBold, color = androidx.compose.ui.graphics.Color(0xFFFFE56B))
+                Text("TUS CARTONES, TU PARTIDA", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White)
             }
         })
     }) { pad ->
@@ -192,7 +204,7 @@ private fun TicketPanel(
     onClear: () -> Unit,
     onRemove: () -> Unit
 ) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)) {
         Column(Modifier.padding(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -208,7 +220,7 @@ private fun TicketPanel(
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
                         Box(
-                            Modifier.weight(1f).padding(1.dp).aspectRatio(0.86f)
+                            Modifier.weight(1f).padding(0.5.dp).aspectRatio(0.98f)
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(if (n == 0) MaterialTheme.colorScheme.surface else if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                                 .then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier),
