@@ -185,7 +185,7 @@ private fun MiBingoApp() {
                             message = "Cartones guardados. Puedes guardar más cuando quieras."
                         }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
                     }
-                    if (message.isNotBlank()) Text(message, color = Green, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall, maxLines = 1)
+                    if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     if (activeIds.size > 3) {
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             (0..1).forEach { side ->
