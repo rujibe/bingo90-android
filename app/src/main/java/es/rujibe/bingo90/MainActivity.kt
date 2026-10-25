@@ -82,6 +82,7 @@ private fun MiBingoApp() {
     var count by remember { mutableIntStateOf(6) }
     var pendingMode by remember { mutableStateOf("series") }
     var options by remember { mutableStateOf(false) }
+    var canUndoMarks by remember { mutableStateOf(hasMarksSnapshot(ctx)) }
     var nameInput by remember { mutableStateOf("") }
     var numbersInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
@@ -101,6 +102,20 @@ private fun MiBingoApp() {
     var chooseSearch by remember { mutableStateOf("") }
 
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
+    fun snapshotMarks() { saveMarksSnapshot(ctx, cards); canUndoMarks = true }
+    fun undoMarks() {
+        val snapshot = loadMarksSnapshot(ctx)
+        if (snapshot != null) {
+            cards.indices.forEach { i ->
+                val previous = snapshot[cards[i].id]
+                if (previous != null) cards[i] = cards[i].copy(marked = previous)
+            }
+            saveCards(ctx, cards)
+            clearMarksSnapshot(ctx)
+            canUndoMarks = false
+            message = "Se han recuperado las marcas anteriores."
+        }
+    }
     fun saveActiveCardsToLibrary(): Int {
         val toSave = cards.filter { it.id in activeIds }
         var added = 0
@@ -156,6 +171,7 @@ private fun MiBingoApp() {
             val t = Ticket(nextTicketId(cards), "Cartón 1", generateGrid())
             cards.add(t); saveCards(ctx, cards); activeIds.add(t.id)
         }
+        snapshotMarks()
         cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
         saveCards(ctx, cards); persistActive()
         page = "game"
@@ -180,7 +196,10 @@ private fun MiBingoApp() {
                     }, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                     if (page == "home") Text("TUS CARTONES, TU PARTIDA", color = Yellow, style = MaterialTheme.typography.labelSmall)
                 }
-                if (page == "game") Text("↻", Modifier.clickable { options = true }.padding(4.dp), color = Yellow, style = MaterialTheme.typography.headlineMedium)
+                if (page == "game") Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (canUndoMarks) Text("↶", Modifier.clickable { undoMarks() }.padding(horizontal = 5.dp), color = Yellow, style = MaterialTheme.typography.headlineMedium)
+                    Text("↻", Modifier.clickable { options = true }.padding(4.dp), color = Yellow, style = MaterialTheme.typography.headlineMedium)
+                }
             }
 
             when (page) {
@@ -310,6 +329,7 @@ private fun MiBingoApp() {
                                             val j = cards.indexOfFirst { it.id == id }
                                             if (j >= 0) {
                                                 val old = cards[j]
+                                                snapshotMarks()
                                                 cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)
                                                 saveCards(ctx, cards)
                                             }
@@ -317,6 +337,7 @@ private fun MiBingoApp() {
                                         onClear = {
                                             val j = cards.indexOfFirst { it.id == id }
                                             if (j >= 0) {
+                                                snapshotMarks()
                                                 cards[j] = cards[j].copy(marked = emptySet())
                                                 saveCards(ctx, cards)
                                             }
@@ -491,6 +512,7 @@ private fun MiBingoApp() {
                                         }
                                     }
                                 }
+                                snapshotMarks()
                                 cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
                                 saveCards(ctx, cards)
                                 persistActive()
@@ -667,7 +689,7 @@ private fun MiBingoApp() {
             HorizontalDivider()
             Text("¿Desea jugar con los mismos cartones?", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }; saveCards(ctx, cards); options = false; message = "Marcas borradas. ¡Nueva partida!" }, modifier = Modifier.weight(1f)) { Text("Sí") }
+                Button(onClick = { snapshotMarks(); cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }; saveCards(ctx, cards); options = false; message = "Marcas borradas. ¡Nueva partida!" }, modifier = Modifier.weight(1f)) { Text("Sí") }
                 OutlinedButton(onClick = { options = false; page = "home" }, modifier = Modifier.weight(1f)) { Text("No") }
             }
             HorizontalDivider()
@@ -806,6 +828,35 @@ private fun loadActiveIds(ctx: Context): List<Long> {
     return try { val a = JSONArray(saved); (0 until a.length()).map { a.getLong(it) } } catch (_: Exception) { emptyList() }
 }
 private fun saveActiveIds(ctx: Context, ids: List<Long>) { ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("activeIds", JSONArray(ids).toString()).apply() }
+private fun hasMarksSnapshot(ctx: Context): Boolean =
+    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).contains("undo_marks")
+
+private fun saveMarksSnapshot(ctx: Context, cards: List<Ticket>) {
+    val root = JSONObject()
+    cards.forEach { ticket -> root.put(ticket.id.toString(), JSONArray(ticket.marked.toList())) }
+    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit()
+        .putString("undo_marks", root.toString()).apply()
+}
+
+private fun loadMarksSnapshot(ctx: Context): Map<Long, Set<Int>>? {
+    val raw = ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).getString("undo_marks", null) ?: return null
+    return try {
+        val root = JSONObject(raw)
+        val result = mutableMapOf<Long, Set<Int>>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val arr = root.getJSONArray(key)
+            result[key.toLong()] = (0 until arr.length()).map { arr.getInt(it) }.toSet()
+        }
+        result
+    } catch (_: Exception) { null }
+}
+
+private fun clearMarksSnapshot(ctx: Context) {
+    ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().remove("undo_marks").apply()
+}
+
 private fun loadCards(ctx: Context): List<Ticket> {
     val saved = ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).getString("cards", null)
     if (saved != null) try {
