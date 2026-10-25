@@ -685,8 +685,21 @@ private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false,
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
-                        Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .25.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(if (compact) .35.dp else .45.dp, if (compact) Color(0xFFB6B6B6) else Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
-                            if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else if (compact) Color(0xFF171717) else Blue, fontWeight = FontWeight.Bold, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .25.dp else .5.dp).background(
+                            when {
+                                marked -> Color(0xFF75D65B)
+                                n > 0 -> Color(0xFFF3F8FF)
+                                else -> Color.White
+                            }
+                        ).border(if (compact) .35.dp else .45.dp, if (compact) Color(0xFFB6CBE5) else Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                            if (n > 0) Text(
+                                n.toString(),
+                                color = if (marked) Color(0xFF123D12) else if (compact) Color(0xFF123B68) else Blue,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = if (compact) 19.sp else 15.sp,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
