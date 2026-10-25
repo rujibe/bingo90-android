@@ -770,7 +770,7 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
                     val n = grid[r][c]
                     Box(
                         Modifier.weight(1f).aspectRatio(1.35f)
-                            .background(if (n > 0) Color(0xFFF1F7FF) else Color(0xFFF8FAFC))
+                            .background(Color.White)
                             .border(.35.dp, Color(0xFFB7D0F2)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -784,21 +784,21 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 
 @Composable
 private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
-    Card(modifier.fillMaxWidth().border(1.dp, if (compact) Color(0xFFB47A40) else Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+    Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.fillMaxSize().padding(if (compact) 0.dp else 5.dp)) {
             if (compact) {
                 Row(
                     Modifier.fillMaxWidth().height(21.dp).background(
-                        Brush.horizontalGradient(listOf(Color(0xFFF39A2D), Color(0xFFFFFF71), Color(0xFF26A653)))
+                        Blue
                     ).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("B", color = Red, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                    Text("I", color = Blue, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                    Text("N", color = Purple, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                    Text("G", color = Green, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                    Text("O", color = DarkRed, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                    Text("90", color = Blue, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("B", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("I", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("N", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("G", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("O", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("90", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
                     Spacer(Modifier.weight(1f))
                     Text("CARTÓN $position", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, maxLines = 1)
                 }
@@ -809,21 +809,21 @@ private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false,
                     TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
                 }
             }
-            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(if (compact) .5.dp else 1.dp, if (compact) Color(0xFFB6B6B6) else Blue).padding(if (compact) 0.dp else 1.dp)) {
+            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(if (compact) .5.dp else 1.dp, Blue).padding(if (compact) 0.dp else 1.dp)) {
                 for (r in 0..2) Row(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier)) {
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
                         Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .25.dp else .5.dp).background(
                             when {
-                                marked -> Color(0xFF75D65B)
-                                n > 0 -> Color(0xFFF3F8FF)
+                                marked -> Green
+                                n > 0 -> Color.White
                                 else -> Color.White
                             }
-                        ).border(if (compact) .35.dp else .45.dp, if (compact) Color(0xFFB6CBE5) else Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                        ).border(if (compact) .35.dp else .45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
                             if (n > 0) Text(
                                 n.toString(),
-                                color = if (marked) Color(0xFF123D12) else if (compact) Color(0xFF123B68) else Blue,
+                                color = if (marked) Color.White else Blue,
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = if (compact) 19.sp else 15.sp,
                                 maxLines = 1,
