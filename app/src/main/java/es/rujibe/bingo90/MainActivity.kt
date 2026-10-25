@@ -150,8 +150,7 @@ private fun MiBingoApp() {
         cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
         saveCards(ctx, cards); persistActive()
         page = "game"
-        (ctx as? ComponentActivity)?.requestedOrientation =
-            if (activeIds.size > 4) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     val compactSix = page == "game" && landscape && activeIds.size > 4
@@ -227,80 +226,56 @@ private fun MiBingoApp() {
                     }
                     BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
-                "game" -> Box(Modifier.fillMaxSize()) {
-                    Column(
-                        Modifier.fillMaxSize()
-                            .padding(horizontal = 2.dp, vertical = 1.dp)
-                            .then(if (compactSix) Modifier.padding(start = 58.dp) else Modifier)
+                "game" -> Column(
+                    Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().height(36.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                    if (compactSix) {
-                        Spacer(Modifier.height(1.dp))
-                    } else {
-                        Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Opciones") }
-                            TextButton(onClick = {
+                        Text(
+                            "Cartones: ${activeIds.size}/6",
+                            Modifier.weight(1f),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        TextButton(
+                            onClick = { options = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) { Text("Opciones") }
+                        TextButton(
+                            onClick = {
                                 val added = saveActiveCardsToLibrary()
                                 message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
-                            }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Guardar") }
-                        }
-                        if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                            },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) { Text("Guardar") }
                     }
-                    val portraitTicketHeight = when (activeIds.size) {
-                        1 -> 142.dp
-                        2 -> 126.dp
-                        3 -> 112.dp
-                        else -> 100.dp
+                    if (message.isNotBlank()) {
+                        Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
-                    if (compactSix) {
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            activeIds.take(6).toList().chunked(2).forEach { rowIds ->
-                                Row(
-                                    Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    rowIds.forEach { id ->
-                                        val ticketIndex = cards.indexOfFirst { it.id == id }
-                                        if (ticketIndex >= 0) {
-                                            val ticket = cards[ticketIndex]
-                                            TicketPanel(
-                                                ticket,
-                                                activeIds.indexOf(id) + 1,
-                                                compact = true,
-                                                modifier = Modifier.weight(1f).fillMaxHeight(),
-                                                onToggle = { n ->
-                                                    val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) {
-                                                        val old = cards[j]
-                                                        cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)
-                                                        saveCards(ctx, cards)
-                                                    }
-                                                },
-                                                onClear = {
-                                                    val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) {
-                                                        cards[j] = cards[j].copy(marked = emptySet())
-                                                        saveCards(ctx, cards)
-                                                    }
-                                                },
-                                                onRemove = {
-                                                    activeIds.remove(id)
-                                                    persistActive()
-                                                    if (activeIds.size <= 4) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                                }
-                                            )
-                                        }
-                                    }
-                                    if (rowIds.size == 1) Spacer(Modifier.weight(1f))
-                                }
-                            }
+                    BoxWithConstraints(
+                        Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        val visibleCount = activeIds.size.coerceIn(1, MAX_ACTIVE)
+                        val spacing = 4.dp
+                        val availablePerTicket = (maxHeight - spacing * (visibleCount - 1)) / visibleCount
+                        val preferredHeight = when (visibleCount) {
+                            1 -> 250.dp
+                            2 -> 205.dp
+                            3 -> 168.dp
+                            4 -> 138.dp
+                            5 -> 112.dp
+                            else -> 96.dp
                         }
-                    } else {
+                        val ticketHeight = minOf(availablePerTicket, preferredHeight)
                         Column(
-                            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(spacing),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            activeIds.take(4).toList().forEachIndexed { index, id ->
+                            activeIds.take(MAX_ACTIVE).toList().forEachIndexed { index, id ->
                                 val ticketIndex = cards.indexOfFirst { it.id == id }
                                 if (ticketIndex >= 0) {
                                     val ticket = cards[ticketIndex]
@@ -308,7 +283,9 @@ private fun MiBingoApp() {
                                         ticket,
                                         index + 1,
                                         compact = true,
-                                        modifier = Modifier.fillMaxWidth().height(portraitTicketHeight),
+                                        modifier = Modifier.fillMaxWidth(0.90f)
+                                            .widthIn(max = 540.dp)
+                                            .height(ticketHeight),
                                         onToggle = { n ->
                                             val j = cards.indexOfFirst { it.id == id }
                                             if (j >= 0) {
@@ -324,37 +301,13 @@ private fun MiBingoApp() {
                                                 saveCards(ctx, cards)
                                             }
                                         },
-                                        onRemove = { activeIds.remove(id); persistActive() }
+                                        onRemove = {
+                                            activeIds.remove(id)
+                                            persistActive()
+                                            (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                        }
                                     )
                                 }
-                            }
-                        }
-                    }
-                    }
-                    if (compactSix) {
-                        Column(
-                            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(56.dp)
-                                .padding(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Button(
-                                onClick = {
-                                    options = false
-                                    page = "home"
-                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                },
-                                modifier = Modifier.fillMaxWidth().height(82.dp),
-                                contentPadding = PaddingValues(2.dp)
-                            ) {
-                                Text("‹\nMenú", fontSize = 12.sp, lineHeight = 14.sp, textAlign = TextAlign.Center)
-                            }
-                            Button(
-                                onClick = { options = true },
-                                modifier = Modifier.fillMaxWidth().height(82.dp),
-                                contentPadding = PaddingValues(2.dp)
-                            ) {
-                                Text("Opciones", fontSize = 11.sp, lineHeight = 13.sp, textAlign = TextAlign.Center)
                             }
                         }
                     }
@@ -435,8 +388,7 @@ private fun MiBingoApp() {
                                 saveCards(ctx, cards)
                                 persistActive()
                                 page = "game"
-                                (ctx as? ComponentActivity)?.requestedOrientation =
-                                    if (activeIds.size > 4) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             },
                             enabled = selectedSavedIds.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth()
