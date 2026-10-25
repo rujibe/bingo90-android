@@ -61,6 +61,7 @@ private fun MiBingoApp() {
     var numbersInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
+    val selectedSavedIds = remember { mutableStateListOf<Long>() }
 
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
     fun addTicket(ticket: Ticket) {
@@ -184,41 +185,26 @@ private fun MiBingoApp() {
                     InfoPanel("Tus cartones se guardan en el móvil para usarlos en futuras partidas.")
                 }
                 "saved" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Cartones guardados en este móvil", fontWeight = FontWeight.Bold)
+                    Text("Elige hasta 6 cartones guardados", fontWeight = FontWeight.Bold)
                     cards.filter { it.name.startsWith("Mi cartón") || it.name.startsWith("Mi ") }.forEach { ticket ->
                         Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) { Text(ticket.name, fontWeight = FontWeight.Bold); Text("Creado y guardado en el dispositivo", style = MaterialTheme.typography.bodySmall) }
-                                TextButton(onClick = { if (activeIds.size < 6 && ticket.id !in activeIds) activeIds.add(ticket.id); persistActive(); page = "game" }) { Text("Usar") }
+                                Checkbox(checked = ticket.id in selectedSavedIds, onCheckedChange = { checked ->
+                                    if (checked && selectedSavedIds.size < MAX_ACTIVE) selectedSavedIds.add(ticket.id)
+                                    if (!checked) selectedSavedIds.remove(ticket.id)
+                                }, enabled = ticket.id in selectedSavedIds || selectedSavedIds.size < MAX_ACTIVE)
+                                Column(Modifier.weight(1f)) { Text(ticket.name, fontWeight = FontWeight.Bold); Text("Cartón guardado", style = MaterialTheme.typography.bodySmall) }
                                 TextButton(onClick = { nameInput = ticket.name; numbersInput = ticket.grid.flatten().filter { it > 0 }.joinToString(", "); editingId = ticket.id; page = "create" }) { Text("Editar") }
                             }
                         }
                     }
                     if (cards.none { it.name.startsWith("Mi cartón") || it.name.startsWith("Mi ") }) Text("Todavía no has guardado cartones propios.")
-                    val savedSeries = loadSavedSeries(ctx)
-                    if (savedSeries.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("Series guardadas", fontWeight = FontWeight.Bold)
-                        savedSeries.forEachIndexed { seriesIndex, series ->
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-                                Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Serie guardada ${seriesIndex + 1}", fontWeight = FontWeight.Bold)
-                                        Text("${series.size} cartones", style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    TextButton(onClick = {
-                                        activeIds.clear()
-                                        series.take(count).forEach { ticket ->
-                                            val existing = cards.firstOrNull { it.id == ticket.id }
-                                            if (existing == null) cards.add(ticket.copy(marked = emptySet()))
-                                            if (activeIds.size < count) activeIds.add(ticket.id)
-                                        }
-                                        saveCards(ctx, cards); persistActive(); page = "game"
-                                    }) { Text("Usar serie") }
-                                }
-                            }
-                        }
-                    }
+                    Button(onClick = {
+                        activeIds.clear()
+                        selectedSavedIds.take(MAX_ACTIVE).forEach { activeIds.add(it) }
+                        cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
+                        saveCards(ctx, cards); persistActive(); page = "game"
+                    }, enabled = selectedSavedIds.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Jugar (${selectedSavedIds.size}/6)") }
                     BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editingId = null; page = "create" }
                 }
                 else -> HomePage(onChoose = { page = "choose" }, onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
