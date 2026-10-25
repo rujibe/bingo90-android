@@ -187,23 +187,24 @@ private fun MiBingoApp() {
                     }
                     if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     if (activeIds.size > 3) {
-                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             (0..1).forEach { side ->
                                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    activeIds.toList().withIndex().filter { it.index % 2 == side }.forEach { indexed ->
-                                        val id = indexed.value
-                                        val i = cards.indexOfFirst { it.id == id }
-                                        if (i >= 0) {
-                                            val ticket = cards[i]
-                                            Box(Modifier.weight(1f).fillMaxWidth()) {
-                                                TicketPanel(ticket, indexed.index + 1, compact = true, modifier = Modifier.fillMaxSize(), onToggle = { n ->
-                                                    val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                                }, onClear = {
-                                                    val j = cards.indexOfFirst { it.id == id }
-                                                    if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                                }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 3) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
-                                            }
+                                    (0..2).forEach { rowIndex ->
+                                        val index = rowIndex + side * 3
+                                        val id = activeIds.getOrNull(index)
+                                        val ticketIndex = id?.let { ticketId -> cards.indexOfFirst { it.id == ticketId } } ?: -1
+                                        if (ticketIndex >= 0) {
+                                            val ticket = cards[ticketIndex]
+                                            TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxWidth(), onToggle = { n ->
+                                                val j = cards.indexOfFirst { it.id == id }
+                                                if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                            }, onClear = {
+                                                val j = cards.indexOfFirst { it.id == id }
+                                                if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                            }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 3) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
+                                        } else {
+                                            Spacer(Modifier.weight(1f).fillMaxWidth())
                                         }
                                     }
                                 }
