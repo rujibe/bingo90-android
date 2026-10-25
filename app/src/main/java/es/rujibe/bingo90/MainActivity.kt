@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -125,13 +127,13 @@ private fun MiBingoApp() {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         (1..6).forEach { n ->
                             Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (count == n) Blue else Color.White).border(1.dp, Blue, RoundedCornerShape(8.dp)).clickable { count = n; while (selectedChooseIds.size > n) selectedChooseIds.removeAt(selectedChooseIds.lastIndex) }.padding(vertical = 7.dp), contentAlignment = Alignment.Center) {
-                                Text("$" + "{n}", color = if (count == n) Color.White else Blue, fontWeight = FontWeight.Bold)
+                                Text("$n", color = if (count == n) Color.White else Blue, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     OutlinedTextField(value = chooseSearch, onValueChange = { chooseSearch = it.filter { ch -> ch.isDigit() } }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Buscar por número de cartón (1–1000)") })
-                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        cards.filter { it.id in 1L..1000L && (chooseSearch.isBlank() || it.name.filter { ch -> ch.isDigit() }.contains(chooseSearch)) }.forEach { ticket ->
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(cards.filter { it.id in 1L..1000L && (chooseSearch.isBlank() || it.name.filter { ch -> ch.isDigit() }.contains(chooseSearch)) }, key = { it.id }) { ticket ->
                             Card(
                                 modifier = Modifier.fillMaxWidth().border(1.dp, if (ticket.id in selectedChooseIds) Green else Blue, RoundedCornerShape(6.dp)),
                                 shape = RoundedCornerShape(6.dp),
