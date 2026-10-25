@@ -211,40 +211,22 @@ private fun MiBingoApp() {
                     }
                     BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
-                "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 1.dp)) {
+                "game" -> Box(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier.fillMaxSize()
+                            .padding(horizontal = 2.dp, vertical = 1.dp)
+                            .then(if (compactSix) Modifier.padding(end = 58.dp) else Modifier)
+                    ) {
                     if (compactSix) {
-                        Row(
-                            Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF064AA8)).padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    options = false
-                                    page = "home"
-                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                },
-                                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
-                            ) {
-                                Text("‹ Volver al menú", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Text("Mi Bingo 90", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
-                            Spacer(Modifier.weight(1f))
-                            TextButton(
-                                onClick = { options = true },
-                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
-                            ) {
-                                Text("Opciones", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
-                            }
-                        }
+                        Spacer(Modifier.height(1.dp))
                     } else {
                         Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
+                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Opciones") }
                             TextButton(onClick = {
                                 val added = saveActiveCardsToLibrary()
                                 message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
-                            }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
+                            }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Guardar") }
                         }
                         if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
@@ -304,6 +286,34 @@ private fun MiBingoApp() {
                                     }, onRemove = { activeIds.remove(id); persistActive() })
                                     Spacer(Modifier.height(6.dp))
                                 }
+                            }
+                        }
+                    }
+                    }
+                    if (compactSix) {
+                        Column(
+                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(56.dp)
+                                .padding(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Button(
+                                onClick = {
+                                    options = false
+                                    page = "home"
+                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                },
+                                modifier = Modifier.fillMaxWidth().height(82.dp),
+                                contentPadding = PaddingValues(2.dp)
+                            ) {
+                                Text("‹\nMenú", fontSize = 12.sp, lineHeight = 14.sp, textAlign = TextAlign.Center)
+                            }
+                            Button(
+                                onClick = { options = true },
+                                modifier = Modifier.fillMaxWidth().height(82.dp),
+                                contentPadding = PaddingValues(2.dp)
+                            ) {
+                                Text("Opciones", fontSize = 11.sp, lineHeight = 13.sp, textAlign = TextAlign.Center)
                             }
                         }
                     }
