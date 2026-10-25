@@ -331,7 +331,7 @@ private fun generateSeries(): List<List<List<Int>>> {
             val columns = (0..8).map { c ->
                 nums.filter { n -> (if (n < 10) 0 else if (n >= 80) 8 else n / 10) == c }.sorted()
             }
-            if (columns.any { it.size > 3 }) { valid = false; break }
+            if (columns.any { it.isEmpty() || it.size > 3 }) { valid = false; break }
             val grid = placeColumns(columns)
             if (grid == null) { valid = false; break }
             grids.add(grid)
