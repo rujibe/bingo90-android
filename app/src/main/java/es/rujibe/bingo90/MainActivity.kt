@@ -84,8 +84,6 @@ private fun MiBingoApp() {
         } else {
             cards.shuffled().take(count).forEach { activeIds.add(it.id) }
         }
-        (ctx as? ComponentActivity)?.requestedOrientation =
-            if (activeIds.size > 3) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         if (activeIds.isEmpty()) {
             val t = Ticket(nextTicketId(cards), "Cartón 1", generateGrid())
             cards.add(t); saveCards(ctx, cards); activeIds.add(t.id)
@@ -93,9 +91,11 @@ private fun MiBingoApp() {
         cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
         saveCards(ctx, cards); persistActive()
         page = "game"
+        (ctx as? ComponentActivity)?.requestedOrientation =
+            if (activeIds.size > 3) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp)) {
+    Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
         Column(Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)).background(Brush.verticalGradient(listOf(Cream, Yellow)))) {
             Row(
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
@@ -146,6 +146,7 @@ private fun MiBingoApp() {
                                     }, enabled = ticket.id in selectedChooseIds || selectedChooseIds.size < count)
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(ticket.name, color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                        Text(if (ticket.id in 1L..1000L) "Serie ${((ticket.id - 1) / 6) + 1} · Cartón ${((ticket.id - 1) % 6) + 1} de 6" else "Cartón personalizado", color = DarkRed, style = MaterialTheme.typography.labelSmall)
                                         TicketPreviewGrid(ticket.grid)
                                     }
                                     Text(if (ticket.id in selectedChooseIds) "✓" else "", color = Green, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 4.dp))
