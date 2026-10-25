@@ -205,6 +205,8 @@ private fun MiBingoApp() {
             when (page) {
                 "home" -> HomePage(
                     onChoose = { page = "choose" },
+                    onResume = { page = "game" },
+                    showResume = activeIds.isNotEmpty(),
                     onRandom = { page = "random" },
                     onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; editorGrid = List(3) { List(9) { 0 } }; page = "create" },
                     onSaved = { page = "saved" }
@@ -708,13 +710,14 @@ private fun MiBingoApp() {
 }
 
 @Composable
-private fun HomePage(onChoose: () -> Unit, onRandom: () -> Unit, onCreate: () -> Unit, onSaved: () -> Unit) {
+private fun HomePage(onChoose: () -> Unit, onResume: () -> Unit, showResume: Boolean, onRandom: () -> Unit, onCreate: () -> Unit, onSaved: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Spacer(Modifier.height(8.dp))
         Text("👑", style = MaterialTheme.typography.displayLarge)
         Text("Mi Bingo", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = Blue)
         Text("BINGO 90", style = MaterialTheme.typography.titleLarge, color = Red, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(8.dp))
+        if (showResume) BigButton("▶", "Continuar partida", "Recupera tus cartones y números marcados", Red, onResume)
         BigButton("▦", "Elegir cartones", "", Blue, onChoose)
         BigButton("🎲", "Selección aleatoria", "", Green, onRandom)
         BigButton("✎", "Crea tus propios cartones", "", Color(0xFFED5A0A), onCreate)
