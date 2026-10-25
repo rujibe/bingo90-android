@@ -267,17 +267,12 @@ private fun MiBingoApp() {
                         val visibleCount = activeIds.size.coerceIn(1, MAX_ACTIVE)
                         val spacing = 4.dp
                         val availablePerTicket = (maxHeight - spacing * (visibleCount - 1)) / visibleCount
-                        val preferredHeight = when (visibleCount) {
-                            1 -> 138.dp
-                            2 -> 138.dp
-                            3 -> 138.dp
-                            4 -> 138.dp
-                            5 -> 112.dp
-                            else -> 96.dp
-                        }
+                        // Preserve the familiar 138dp ticket height where possible.
+                        // For 5–6 tickets, shrink only as much as needed to fit them all.
+                        val preferredHeight = 138.dp
                         val ticketHeight = minOf(availablePerTicket, preferredHeight)
                         val totalTicketHeight = ticketHeight * visibleCount + spacing * (visibleCount - 1)
-                        val centerVertically = visibleCount <= 4 && totalTicketHeight <= maxHeight
+                        val centerVertically = totalTicketHeight <= maxHeight
                         val cardListModifier = when {
                             centerVertically -> Modifier.fillMaxHeight()
                             totalTicketHeight <= maxHeight -> Modifier.fillMaxWidth()
