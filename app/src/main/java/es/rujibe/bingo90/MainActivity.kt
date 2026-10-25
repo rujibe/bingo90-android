@@ -196,7 +196,7 @@ private fun MiBingoApp() {
                                         if (i >= 0) {
                                             val ticket = cards[i]
                                             Box(Modifier.weight(1f).fillMaxWidth()) {
-                                                TicketPanel(ticket, indexed.index + 1, compact = true, onToggle = { n ->
+                                                TicketPanel(ticket, indexed.index + 1, compact = true, modifier = Modifier.fillMaxSize(), onToggle = { n ->
                                                     val j = cards.indexOfFirst { it.id == id }
                                                     if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
                                                 }, onClear = {
@@ -384,16 +384,16 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 }
 
 @Composable
-private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
-    Card(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(if (compact) 2.dp else 5.dp)) {
+private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
+    Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Column(Modifier.fillMaxSize().padding(if (compact) 1.dp else 5.dp)) {
             if (!compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(27.dp).clip(RoundedCornerShape(50)).background(Blue), contentAlignment = Alignment.Center) { Text("$position", color = Color.White, fontWeight = FontWeight.Bold) }
                 Text(ticket.name, Modifier.weight(1f).padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Blue, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
             }
-            Column(Modifier.fillMaxWidth().border(1.dp, Blue).padding(1.dp)) {
-                for (r in 0..2) Row(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(1.dp, Blue).padding(1.dp)) {
+                for (r in 0..2) Row(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier)) {
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
