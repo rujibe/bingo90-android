@@ -241,7 +241,7 @@ private fun MiBingoApp() {
 }
 
 @Composable
-private fun HomePage(onChoose: () -> Unit, onRandom: () -> Unit, onCount: () -> Unit, onCreate: () -> Unit, onSaved: () -> Unit) {
+private fun HomePage(onChoose: () -> Unit, onRandom: () -> Unit, onCreate: () -> Unit, onSaved: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Spacer(Modifier.height(8.dp))
         Text("👑", style = MaterialTheme.typography.displayLarge)
@@ -250,7 +250,6 @@ private fun HomePage(onChoose: () -> Unit, onRandom: () -> Unit, onCount: () -> 
         Spacer(Modifier.height(8.dp))
         BigButton("▦", "Elegir cartones", "", Blue, onChoose)
         BigButton("🎲", "Selección aleatoria", "", Green, onRandom)
-        BigButton("123", "N° de cartones", "De 1 a 6", Purple, onCount)
         BigButton("✎", "Crea tus propios cartones", "", Color(0xFFED5A0A), onCreate)
         BigButton("▣", "Cartones guardados", "", Red, onSaved)
         Spacer(Modifier.height(4.dp))
