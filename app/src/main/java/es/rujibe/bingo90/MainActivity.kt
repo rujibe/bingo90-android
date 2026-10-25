@@ -266,7 +266,10 @@ private fun MiBingoApp() {
                     ) {
                         val visibleCount = activeIds.size.coerceIn(1, MAX_ACTIVE)
                         val spacing = 4.dp
-                        val availablePerTicket = (maxHeight - spacing * (visibleCount - 1)) / visibleCount
+                        // When using six tickets, leave some breathing room at both ends
+                        // so the last ticket does not sit flush against the bottom edge.
+                        val verticalBreathingRoom = if (visibleCount == 6) 24.dp else 0.dp
+                        val availablePerTicket = (maxHeight - spacing * (visibleCount - 1) - verticalBreathingRoom) / visibleCount
                         // Preserve the familiar 138dp ticket height where possible.
                         // For 5–6 tickets, shrink only as much as needed to fit them all.
                         val preferredHeight = 138.dp
