@@ -2,6 +2,10 @@ package es.rujibe.bingo90
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Build
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.activity.ComponentActivity
@@ -25,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.random.Random
@@ -42,10 +47,31 @@ private data class Ticket(val id: Long, val name: String, val grid: List<List<In
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hideNavigationBar()
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(primary = Blue, onPrimary = Color.White, secondary = Yellow, background = Yellow, surface = Cream, error = Red)) {
                 MiBingoApp()
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideNavigationBar()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun hideNavigationBar() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let { controller ->
+                controller.hide(WindowInsets.Type.navigationBars())
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         }
     }
 }
@@ -53,7 +79,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MiBingoApp() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val cards = remember { mutableStateListOf<Ticket>().apply { addAll(loadCards(ctx)) } }
     val activeIds = remember { mutableStateListOf<Long>().apply {
         addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } }.distinct().take(MAX_ACTIVE))
@@ -97,9 +123,10 @@ private fun MiBingoApp() {
             if (activeIds.size > 4) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
-    Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
-        Column(Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)).background(Brush.verticalGradient(listOf(Cream, Yellow)))) {
-            if (!(page == "game" && activeIds.size > 4)) Row(
+    val compactSix = page == "game" && landscape && activeIds.size > 4
+    Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(if (compactSix) Color(0xFF064AA8) else Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
+        Column(Modifier.fillMaxSize().clip(RoundedCornerShape(if (compactSix) 0.dp else 9.dp)).then(if (compactSix) Modifier.background(Color(0xFF064AA8)) else Modifier.background(Brush.verticalGradient(listOf(Cream, Yellow))))) {
+            if (!(page == "game" && landscape && activeIds.size > 4)) Row(
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -170,49 +197,77 @@ private fun MiBingoApp() {
                     BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
                 "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 1.dp)) {
-                    if (landscape && activeIds.size > 4) {
-                        Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; page = "home" }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("‹ Menú", style = MaterialTheme.typography.labelSmall) }
-                            Text("Mi Bingo 90", Modifier.weight(1f), color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("Opciones", style = MaterialTheme.typography.labelSmall) }
+                    if (compactSix) {
+                        Row(
+                            Modifier.fillMaxWidth().height(25.dp).background(Color(0xFF064AA8)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "‹ Volver al menú",
+                                Modifier.clickable {
+                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                    page = "home"
+                                }.padding(horizontal = 7.dp, vertical = 2.dp),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                            Text("Mi Bingo 90", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+                            Text(
+                                "Opciones",
+                                Modifier.clickable { options = true }.padding(horizontal = 7.dp, vertical = 2.dp),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
                         }
-                    }
-                    Row(Modifier.fillMaxWidth().height(if (landscape && activeIds.size > 4) 24.dp else 36.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                        TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
-                        TextButton(onClick = {
-                            val toSave = cards.filter { it.id in activeIds }
-                            toSave.forEach { ticket ->
-                                val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
-                                val alreadySaved = cards.any { it.id !in (1L..1000L) && it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",") == signature }
-                                if (ticket.id in 1L..1000L && !alreadySaved) {
-                                    cards.add(ticket.copy(id = nextTicketId(cards), name = "Guardado - " + ticket.name, marked = emptySet()))
-                                }
-                            }
-                            saveSeries(ctx, toSave)
-                            saveCards(ctx, cards)
-                            message = "Cartones guardados. Puedes guardar más cuando quieras."
-                        }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
-                    }
-                    if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                    if (activeIds.size > 3) {
-                        if (landscape && activeIds.size > 4) {
-                            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                activeIds.toList().forEachIndexed { index, id ->
-                                    val ticketIndex = cards.indexOfFirst { it.id == id }
-                                    if (ticketIndex >= 0) {
-                                        val ticket = cards[ticketIndex]
-                                        TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxHeight(), onToggle = { n ->
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                        }, onClear = {
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                        }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 4) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
+                    } else {
+                        Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
+                            TextButton(onClick = {
+                                val toSave = cards.filter { it.id in activeIds }
+                                toSave.forEach { ticket ->
+                                    val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
+                                    val alreadySaved = cards.any { it.id !in (1L..1000L) && it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",") == signature }
+                                    if (ticket.id in 1L..1000L && !alreadySaved) {
+                                        cards.add(ticket.copy(id = nextTicketId(cards), name = "Guardado - " + ticket.name, marked = emptySet()))
                                     }
                                 }
-                            }
-                        } else {
+                                saveSeries(ctx, toSave)
+                                saveCards(ctx, cards)
+                                message = "Cartones guardados. Puedes guardar más cuando quieras."
+                            }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
+                        }
+                        if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
+                    if (activeIds.size > 3) {
+                        if (landscape && activeIds.size > 4) {
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                activeIds.take(6).toList().chunked(2).forEach { rowIds ->
+                                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        rowIds.forEach { id ->
+                                            val ticketIndex = cards.indexOfFirst { it.id == id }
+                                            if (ticketIndex >= 0) {
+                                                val ticket = cards[ticketIndex]
+                                                TicketPanel(ticket, activeIds.indexOf(id) + 1, compact = true, modifier = Modifier.weight(1f).fillMaxHeight(), onToggle = { n ->
+                                                    val j = cards.indexOfFirst { it.id == id }
+                                                    if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                                }, onClear = {
+                                                    val j = cards.indexOfFirst { it.id == id }
+                                                    if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                                }, onRemove = {
+                                                    activeIds.remove(id); persistActive()
+                                                    if (activeIds.size <= 4) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                                })
+                                            }
+                                        }
+                                        if (rowIds.size == 1) Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }                        } else {
                             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 activeIds.take(4).toList().forEachIndexed { index, id ->
                                     val ticketIndex = cards.indexOfFirst { it.id == id }
@@ -405,32 +460,49 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 
 @Composable
 private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
-    Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+    Card(modifier.fillMaxWidth().border(1.dp, if (compact) Color(0xFFB47A40) else Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.fillMaxSize().padding(if (compact) 0.dp else 5.dp)) {
-            if (!compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(27.dp).clip(RoundedCornerShape(50)).background(Blue), contentAlignment = Alignment.Center) { Text("$position", color = Color.White, fontWeight = FontWeight.Bold) }
-                Text(ticket.name, Modifier.weight(1f).padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Blue, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
+            if (compact) {
+                Row(
+                    Modifier.fillMaxWidth().height(21.dp).background(
+                        Brush.horizontalGradient(listOf(Color(0xFFF39A2D), Color(0xFFFFFF71), Color(0xFF26A653)))
+                    ).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("B", color = Red, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("I", color = Blue, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("N", color = Purple, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("G", color = Green, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("O", color = DarkRed, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text("90", color = Blue, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("CARTÓN $position", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, maxLines = 1)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(27.dp).clip(RoundedCornerShape(50)).background(Blue), contentAlignment = Alignment.Center) { Text("$position", color = Color.White, fontWeight = FontWeight.Bold) }
+                    Text(ticket.name, Modifier.weight(1f).padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Blue, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
+                }
             }
-            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(if (compact) .5.dp else 1.dp, Blue).padding(if (compact) 0.dp else 1.dp)) {
+            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(if (compact) .5.dp else 1.dp, if (compact) Color(0xFFB6B6B6) else Blue).padding(if (compact) 0.dp else 1.dp)) {
                 for (r in 0..2) Row(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier)) {
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
-                        Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .1.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(if (compact) .35.dp else .45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
-                            if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .25.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(if (compact) .35.dp else .45.dp, if (compact) Color(0xFFB6B6B6) else Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                            if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else if (compact) Color(0xFF171717) else Blue, fontWeight = FontWeight.Bold, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (!compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("${ticket.marked.size}/15 marcados", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar marcas", style = MaterialTheme.typography.labelSmall) }
             }
         }
     }
 }
-
 private fun nextTicketId(cards: List<Ticket>): Long = maxOf(System.currentTimeMillis(), (cards.maxOfOrNull { it.id } ?: 0L) + 1L)
 private fun loadActiveIds(ctx: Context): List<Long> {
     val saved = ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).getString("activeIds", null) ?: return emptyList()
