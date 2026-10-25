@@ -92,6 +92,28 @@ private fun MiBingoApp() {
     var chooseSearch by remember { mutableStateOf("") }
 
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
+    fun saveActiveCardsToLibrary(): Int {
+        val toSave = cards.filter { it.id in activeIds }
+        var added = 0
+        toSave.forEach { ticket ->
+            val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
+            val alreadySaved = cards.any { saved ->
+                saved.id !in (1L..1000L) &&
+                    saved.grid.flatten().filter { it > 0 }.sorted().joinToString(",") == signature
+            }
+            if (!alreadySaved && ticket.id in (1L..1000L)) {
+                cards.add(ticket.copy(
+                    id = nextTicketId(cards),
+                    name = "Guardado - " + ticket.name,
+                    marked = emptySet()
+                ))
+                added++
+            }
+        }
+        saveSeries(ctx, toSave)
+        saveCards(ctx, cards)
+        return added
+    }
     fun addTicket(ticket: Ticket) {
         if (activeIds.size < MAX_ACTIVE && ticket.id !in activeIds) activeIds.add(ticket.id)
         persistActive()
@@ -192,46 +214,36 @@ private fun MiBingoApp() {
                 "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 1.dp)) {
                     if (compactSix) {
                         Row(
-                            Modifier.fillMaxWidth().height(25.dp).background(Color(0xFF064AA8)),
+                            Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF064AA8)).padding(horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "‹ Volver al menú",
-                                Modifier.clickable {
-                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            TextButton(
+                                onClick = {
+                                    options = false
                                     page = "home"
-                                }.padding(horizontal = 7.dp, vertical = 2.dp),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1
-                            )
-                            Text("Mi Bingo 90", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
-                            Text(
-                                "Opciones",
-                                Modifier.clickable { options = true }.padding(horizontal = 7.dp, vertical = 2.dp),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1
-                            )
+                                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                },
+                                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
+                            ) {
+                                Text("‹ Volver al menú", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text("Mi Bingo 90", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
+                            Spacer(Modifier.weight(1f))
+                            TextButton(
+                                onClick = { options = true },
+                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
+                            ) {
+                                Text("Opciones", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                            }
                         }
                     } else {
                         Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                             TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
                             TextButton(onClick = {
-                                val toSave = cards.filter { it.id in activeIds }
-                                toSave.forEach { ticket ->
-                                    val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
-                                    val alreadySaved = cards.any { it.id !in (1L..1000L) && it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",") == signature }
-                                    if (ticket.id in 1L..1000L && !alreadySaved) {
-                                        cards.add(ticket.copy(id = nextTicketId(cards), name = "Guardado - " + ticket.name, marked = emptySet()))
-                                    }
-                                }
-                                saveSeries(ctx, toSave)
-                                saveCards(ctx, cards)
-                                message = "Cartones guardados. Puedes guardar más cuando quieras."
+                                val added = saveActiveCardsToLibrary()
+                                message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
                             }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
                         }
                         if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -240,7 +252,7 @@ private fun MiBingoApp() {
                         if (landscape && activeIds.size > 4) {
                             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 activeIds.take(6).toList().chunked(2).forEach { rowIds ->
-                                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         rowIds.forEach { id ->
                                             val ticketIndex = cards.indexOfFirst { it.id == id }
                                             if (ticketIndex >= 0) {
@@ -328,28 +340,65 @@ private fun MiBingoApp() {
                     }, modifier = Modifier.fillMaxWidth()) { Text("Guardar cartón") }
                     InfoPanel("Los cartones se guardan en este móvil para futuras partidas sin conexión.")
                 }
-                "saved" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Elige hasta 6 cartones guardados", fontWeight = FontWeight.Bold)
-                    cards.filter { it.id !in (1L..1000L) }.forEach { ticket ->
-                        Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = ticket.id in selectedSavedIds, onCheckedChange = { checked ->
-                                    if (checked && selectedSavedIds.size < MAX_ACTIVE) selectedSavedIds.add(ticket.id)
-                                    if (!checked) selectedSavedIds.remove(ticket.id)
-                                }, enabled = ticket.id in selectedSavedIds || selectedSavedIds.size < MAX_ACTIVE)
-                                Column(Modifier.weight(1f)) { Text(ticket.name, fontWeight = FontWeight.Bold); Text("Cartón guardado", style = MaterialTheme.typography.bodySmall) }
-                                TextButton(onClick = { nameInput = ticket.name; numbersInput = ""; editorGrid = ticket.grid.map { it.toList() }; editingId = ticket.id; message = ""; page = "create" }) { Text("Editar") }
+                "saved" -> {
+                    val savedCards = cards.filter { it.id !in (1L..1000L) }
+                    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Cartones guardados: ${savedCards.size}. Puedes guardar tantos como quieras.", fontWeight = FontWeight.Bold)
+                        LazyColumn(
+                            Modifier.weight(1f).fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(savedCards, key = { it.id }) { ticket ->
+                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(
+                                            checked = ticket.id in selectedSavedIds,
+                                            onCheckedChange = { checked ->
+                                                if (checked && selectedSavedIds.size < MAX_ACTIVE) selectedSavedIds.add(ticket.id)
+                                                if (!checked) selectedSavedIds.remove(ticket.id)
+                                            },
+                                            enabled = ticket.id in selectedSavedIds || selectedSavedIds.size < MAX_ACTIVE
+                                        )
+                                        Column(Modifier.weight(1f)) {
+                                            Text(ticket.name, fontWeight = FontWeight.Bold)
+                                            Text("Cartón guardado", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                        TextButton(onClick = {
+                                            nameInput = ticket.name
+                                            numbersInput = ""
+                                            editorGrid = ticket.grid.map { it.toList() }
+                                            editingId = ticket.id
+                                            message = ""
+                                            page = "create"
+                                        }) { Text("Editar") }
+                                    }
+                                }
                             }
                         }
+                        if (savedCards.isEmpty()) Text("Todavía no has guardado cartones propios.")
+                        Button(
+                            onClick = {
+                                activeIds.clear()
+                                selectedSavedIds.take(MAX_ACTIVE).forEach { activeIds.add(it) }
+                                cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
+                                saveCards(ctx, cards)
+                                persistActive()
+                                page = "game"
+                                (ctx as? ComponentActivity)?.requestedOrientation =
+                                    if (activeIds.size > 4) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            },
+                            enabled = selectedSavedIds.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Jugar (${selectedSavedIds.size}/6)") }
+                        BigButton("+", "Crear nuevo cartón", "", Blue) {
+                            nameInput = ""
+                            numbersInput = ""
+                            editorGrid = List(3) { List(9) { 0 } }
+                            editingId = null
+                            message = ""
+                            page = "create"
+                        }
                     }
-                    if (cards.none { it.id !in (1L..1000L) }) Text("Todavía no has guardado cartones propios.")
-                    Button(onClick = {
-                        activeIds.clear()
-                        selectedSavedIds.take(MAX_ACTIVE).forEach { activeIds.add(it) }
-                        cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
-                        saveCards(ctx, cards); persistActive(); page = "game"
-                    }, enabled = selectedSavedIds.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Jugar (${selectedSavedIds.size}/6)") }
-                    BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editorGrid = List(3) { List(9) { 0 } }; editingId = null; message = ""; page = "create" }
                 }
                 else -> HomePage(onChoose = { page = "choose" }, onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
             }
@@ -380,7 +429,15 @@ private fun MiBingoApp() {
         onDismissRequest = { options = false },
         title = { Text("Opciones", fontWeight = FontWeight.Bold) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("💾  Guardar cartones", Modifier.fillMaxWidth().clickable { saveSeries(ctx, cards.filter { it.id in activeIds }); message = "Serie guardada."; options = false }.padding(8.dp))
+            TextButton(
+                onClick = {
+                    val added = saveActiveCardsToLibrary()
+                    message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
+                    options = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(8.dp)
+            ) { Text("💾 Guardar cartones") }
             HorizontalDivider()
             Text("¿Desea jugar con los mismos cartones?", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -388,7 +445,15 @@ private fun MiBingoApp() {
                 OutlinedButton(onClick = { options = false; page = "home" }, modifier = Modifier.weight(1f)) { Text("No") }
             }
             HorizontalDivider()
-            Text("✖  Volver al menú principal", Modifier.fillMaxWidth().clickable { options = false; page = "home" }.padding(8.dp))
+            TextButton(
+                onClick = {
+                    options = false
+                    page = "home"
+                    (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(8.dp)
+            ) { Text("✖ Volver al menú principal") }
         } },
         confirmButton = { TextButton(onClick = { options = false }) { Text("Cerrar") } }
     )
