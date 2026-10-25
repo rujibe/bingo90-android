@@ -185,7 +185,7 @@ private fun MiBingoApp() {
                             message = "Cartones guardados. Puedes guardar más cuando quieras."
                         }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Guardar") }
                     }
-                    if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    if (message.isNotBlank()) Text(message, color = Green, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall, maxLines = 1)
                     if (activeIds.size > 3) {
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             (0..1).forEach { side ->
@@ -387,18 +387,18 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 @Composable
 private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.fillMaxSize().padding(if (compact) 1.dp else 5.dp)) {
+        Column(Modifier.fillMaxSize().padding(if (compact) 0.dp else 5.dp)) {
             if (!compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(27.dp).clip(RoundedCornerShape(50)).background(Blue), contentAlignment = Alignment.Center) { Text("$position", color = Color.White, fontWeight = FontWeight.Bold) }
                 Text(ticket.name, Modifier.weight(1f).padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Blue, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
             }
-            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(1.dp, Blue).padding(1.dp)) {
+            Column(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier).border(if (compact) .5.dp else 1.dp, Blue).padding(if (compact) 0.dp else 1.dp)) {
                 for (r in 0..2) Row(Modifier.fillMaxWidth().then(if (compact) Modifier.weight(1f) else Modifier)) {
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
-                        Box(Modifier.weight(1f).aspectRatio(if (compact) 1.05f else 1.15f).padding(if (compact) .2.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(.45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).fillMaxHeight().padding(if (compact) .1.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(if (compact) .35.dp else .45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
                             if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
                     }
