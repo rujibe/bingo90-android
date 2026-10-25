@@ -216,7 +216,7 @@ private fun MiBingoApp() {
                     }
                     BigButton("+", "Crear nuevo cartón", "", Blue) { nameInput = ""; numbersInput = ""; editingId = null; page = "create" }
                 }
-                else -> HomePage(onChoose = { page = "choose" }, onRandom = { startGame("random") }, onCount = { page = "count" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
+                else -> HomePage(onChoose = { page = "choose" }, onRandom = { page = "random" }, onCreate = { page = "create" }, onSaved = { page = "saved" })
             }
         }
     }
