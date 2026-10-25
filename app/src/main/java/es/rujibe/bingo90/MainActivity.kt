@@ -316,19 +316,12 @@ private fun placeColumns(columns: List<List<Int>>): List<List<Int>>? {
         for (c in 0..8) {
             val available = (0..2).filter { rowsUsed[it] < 5 }.shuffled()
             if (available.size < columns[c].size) { ok = false; break }
-            available.take(columns[c].size).sorted().forEach { r ->
-                grid[r][c] = columns[c][rowsUsed[c].coerceAtMost(columns[c].lastIndex)]
+            available.take(columns[c].size).sorted().forEachIndexed { i, r ->
+                grid[r][c] = columns[c][i]
                 rowsUsed[r]++
             }
         }
-        if (ok && rowsUsed.all { it == 5 }) {
-            // Restore each column's numbers to the cells assigned in that column.
-            for (c in 0..8) {
-                val rows = (0..2).filter { grid[it][c] != 0 }
-                rows.forEachIndexed { i, r -> grid[r][c] = columns[c][i] }
-            }
-            return grid.map { it.toList() }
-        }
+        if (ok && rowsUsed.all { it == 5 }) return grid.map { it.toList() }
     }
     return null
 }
