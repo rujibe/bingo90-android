@@ -298,6 +298,10 @@ private fun loadCards(ctx: Context): List<Ticket> {
         if (out.isNotEmpty()) return out
     } catch (_: Exception) {}
     val initial = mutableListOf<Ticket>()
+    while (initial.size + 6 <= 1000) {
+        val series = generateSeries()
+        series.forEach { grid -> initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", grid)) }
+    }
     while (initial.size < 1000) initial.add(Ticket(initial.size.toLong() + 1, "Cartón ${initial.size + 1}", generateGrid()))
     saveCards(ctx, initial); return initial
 }
@@ -314,6 +318,24 @@ private fun saveSeries(ctx: Context, cards: List<Ticket>) {
     val arr = JSONArray()
     cards.forEach { t -> val o = JSONObject().put("id", t.id).put("name", t.name); val rows = JSONArray(); t.grid.forEach { rows.put(JSONArray(it)) }; o.put("grid", rows).put("marked", JSONArray()); arr.put(o) }
     ctx.getSharedPreferences("bingo90", Context.MODE_PRIVATE).edit().putString("savedSeries", arr.toString()).apply()
+}
+private fun generateSeries(): List<List<List<Int>>> {
+    while (true) {
+        val shuffled = (1..90).shuffled()
+        val ticketNumbers = (0 until 6).map { i -> shuffled.drop(i * 15).take(15) }
+        val grids = mutableListOf<List<List<Int>>>()
+        var valid = true
+        for (nums in ticketNumbers) {
+            val columns = (0..8).map { c ->
+                nums.filter { n -> (if (n < 10) 0 else if (n >= 80) 8 else n / 10) == c }.sorted()
+            }
+            if (columns.any { it.size > 3 }) { valid = false; break }
+            val grid = placeColumns(columns)
+            if (grid == null) { valid = false; break }
+            grids.add(grid)
+        }
+        if (valid && grids.size == 6) return grids
+    }
 }
 private fun generateGrid(): List<List<Int>> {
     while (true) {
