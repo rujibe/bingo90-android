@@ -53,7 +53,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MiBingoApp() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    var landscape by remember { mutableStateOf(false) }
+    DisposableEffect(ctx) {
+        val listener = android.content.ComponentCallbacks { }
+        val update = { landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+        update()
+        val callbacks = object : android.content.ComponentCallbacks {
+            override fun onConfigurationChanged(newConfig: android.content.res.Configuration) { update() }
+            override fun onLowMemory() {}
+        }
+        ctx.registerComponentCallbacks(callbacks)
+        onDispose { ctx.unregisterComponentCallbacks(callbacks) }
+    }
     val cards = remember { mutableStateListOf<Ticket>().apply { addAll(loadCards(ctx)) } }
     val activeIds = remember { mutableStateListOf<Long>().apply {
         addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } }.distinct().take(MAX_ACTIVE))
