@@ -154,7 +154,7 @@ private fun MiBingoApp() {
                         val i = cards.indexOfFirst { it.id == id }
                         if (i >= 0) {
                             val ticket = cards[i]
-                            TicketPanel(ticket, index + 1, onToggle = { n ->
+                            TicketPanel(ticket, index + 1, compact = activeIds.size >= 4, onToggle = { n ->
                                 val j = cards.indexOfFirst { it.id == id }
                                 if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
                             }, onClear = {
@@ -300,10 +300,10 @@ private fun InfoPanel(text: String) {
 }
 
 @Composable
-private fun TicketPanel(ticket: Ticket, position: Int, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
+private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(5.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(if (compact) 2.dp else 5.dp)) {
+            if (!compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(27.dp).clip(RoundedCornerShape(50)).background(Blue), contentAlignment = Alignment.Center) { Text("$position", color = Color.White, fontWeight = FontWeight.Bold) }
                 Text(ticket.name, Modifier.weight(1f).padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Blue, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Quitar", style = MaterialTheme.typography.labelSmall) }
@@ -313,7 +313,7 @@ private fun TicketPanel(ticket: Ticket, position: Int, onToggle: (Int) -> Unit, 
                     for (c in 0..8) {
                         val n = ticket.grid[r][c]
                         val marked = n > 0 && n in ticket.marked
-                        Box(Modifier.weight(1f).aspectRatio(1.15f).padding(.5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(.45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).aspectRatio(if (compact) 2.4f else 1.15f).padding(if (compact) .2.dp else .5.dp).background(if (marked) Color(0xFF75D65B) else Color.White).border(.45.dp, Color(0xFF91B9F8)).then(if (n > 0) Modifier.clickable { onToggle(n) } else Modifier), contentAlignment = Alignment.Center) {
                             if (n > 0) Text(n.toString(), color = if (marked) Color(0xFF123D12) else Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         }
                     }
