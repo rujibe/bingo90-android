@@ -374,17 +374,30 @@ private fun loadSavedSeries(ctx: Context): List<List<Ticket>> {
     } catch (_: Exception) { emptyList() }
 }
 private fun generateSeries(): List<List<List<Int>>> {
+    // A full strip uses every number 1..90 exactly once, spread over six valid tickets.
     while (true) {
-        val shuffled = (1..90).shuffled()
-        val ticketNumbers = (0 until 6).map { i -> shuffled.drop(i * 15).take(15) }
+        val counts = Array(6) { IntArray(9) { 1 } }
+        val extrasPerColumn = listOf(3, 4, 4, 4, 4, 4, 4, 4, 5)
+        for (c in 0..8) {
+            (0 until 6).shuffled().take(extrasPerColumn[c]).forEach { r -> counts[r][c]++ }
+        }
+        if ((0 until 6).any { r -> counts[r].sum() != 15 }) continue
+        val ticketColumns = Array(6) { MutableList(9) { emptyList<Int>() } }
+        for (c in 0..8) {
+            val low = if (c == 0) 1 else c * 10
+            val high = if (c == 8) 90 else c * 10 + 9
+            val numbers = (low..high).shuffled()
+            var index = 0
+            for (r in 0 until 6) {
+                val amount = counts[r][c]
+                ticketColumns[r][c] = numbers.drop(index).take(amount).sorted()
+                index += amount
+            }
+        }
         val grids = mutableListOf<List<List<Int>>>()
         var valid = true
-        for (nums in ticketNumbers) {
-            val columns = (0..8).map { c ->
-                nums.filter { n -> (if (n < 10) 0 else if (n >= 80) 8 else n / 10) == c }.sorted()
-            }
-            if (columns.any { it.isEmpty() || it.size > 3 }) { valid = false; break }
-            val grid = placeColumns(columns)
+        for (r in 0 until 6) {
+            val grid = placeColumns(ticketColumns[r])
             if (grid == null) { valid = false; break }
             grids.add(grid)
         }
