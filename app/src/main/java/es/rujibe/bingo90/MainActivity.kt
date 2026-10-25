@@ -3,6 +3,7 @@ package es.rujibe.bingo90
 import android.content.Context
 import android.os.Bundle
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MiBingoApp() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val cards = remember { mutableStateListOf<Ticket>().apply { addAll(loadCards(ctx)) } }
     val activeIds = remember { mutableStateListOf<Long>().apply {
         addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } }.distinct().take(MAX_ACTIVE))
@@ -92,12 +94,12 @@ private fun MiBingoApp() {
         saveCards(ctx, cards); persistActive()
         page = "game"
         (ctx as? ComponentActivity)?.requestedOrientation =
-            if (activeIds.size > 3) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            if (activeIds.size > 4) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
         Column(Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)).background(Brush.verticalGradient(listOf(Cream, Yellow)))) {
-            if (!(page == "game" && activeIds.size > 3)) Row(
+            if (!(page == "game" && activeIds.size > 4)) Row(
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -167,8 +169,15 @@ private fun MiBingoApp() {
                     }
                     BigButton("🎲", "Jugar", "$count cartones aleatorios", Green) { startGame("random") }
                 }
-                "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 2.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                "game" -> Column(Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 1.dp)) {
+                    if (landscape && activeIds.size > 4) {
+                        Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; page = "home" }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("‹ Menú", style = MaterialTheme.typography.labelSmall) }
+                            Text("Mi Bingo 90", Modifier.weight(1f), color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                            TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("Opciones", style = MaterialTheme.typography.labelSmall) }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().height(if (landscape && activeIds.size > 4) 24.dp else 36.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Cartones: ${activeIds.size}/6", Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                         TextButton(onClick = { options = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Opciones") }
                         TextButton(onClick = {
@@ -187,25 +196,35 @@ private fun MiBingoApp() {
                     }
                     if (message.isNotBlank()) Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     if (activeIds.size > 3) {
-                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            (0..1).forEach { side ->
-                                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    (0..2).forEach { rowIndex ->
-                                        val index = rowIndex + side * 3
-                                        val id = activeIds.getOrNull(index)
-                                        val ticketIndex = id?.let { ticketId -> cards.indexOfFirst { it.id == ticketId } } ?: -1
-                                        if (ticketIndex >= 0) {
-                                            val ticket = cards[ticketIndex]
-                                            TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxWidth(), onToggle = { n ->
-                                                val j = cards.indexOfFirst { it.id == id }
-                                                if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
-                                            }, onClear = {
-                                                val j = cards.indexOfFirst { it.id == id }
-                                                if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
-                                            }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 3) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
-                                        } else {
-                                            Spacer(Modifier.weight(1f).fillMaxWidth())
-                                        }
+                        if (landscape && activeIds.size > 4) {
+                            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                activeIds.toList().forEachIndexed { index, id ->
+                                    val ticketIndex = cards.indexOfFirst { it.id == id }
+                                    if (ticketIndex >= 0) {
+                                        val ticket = cards[ticketIndex]
+                                        TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxHeight(), onToggle = { n ->
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                        }, onClear = {
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                        }, onRemove = { activeIds.remove(id); persistActive(); if (activeIds.size <= 4) (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT })
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                activeIds.take(4).toList().forEachIndexed { index, id ->
+                                    val ticketIndex = cards.indexOfFirst { it.id == id }
+                                    if (ticketIndex >= 0) {
+                                        val ticket = cards[ticketIndex]
+                                        TicketPanel(ticket, index + 1, compact = true, modifier = Modifier.weight(1f).fillMaxWidth(), onToggle = { n ->
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) { val old = cards[j]; cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n); saveCards(ctx, cards) }
+                                        }, onClear = {
+                                            val j = cards.indexOfFirst { it.id == id }
+                                            if (j >= 0) { cards[j] = cards[j].copy(marked = emptySet()); saveCards(ctx, cards) }
+                                        }, onRemove = { activeIds.remove(id); persistActive() })
                                     }
                                 }
                             }
