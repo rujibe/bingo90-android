@@ -251,11 +251,11 @@ private fun MiBingoApp() {
                         ) { Text("Opciones") }
                         TextButton(
                             onClick = {
-                                val added = saveActiveCardsToLibrary()
-                                message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
+                                packageNameInput = ""
+                                showSavePackageDialog = true
                             },
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) { Text("Guardar") }
+                        ) { Text("Guardar paquete") }
                     }
                     if (message.isNotBlank()) {
                         Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -276,9 +276,20 @@ private fun MiBingoApp() {
                             else -> 96.dp
                         }
                         val ticketHeight = minOf(availablePerTicket, preferredHeight)
+                        val totalTicketHeight = ticketHeight * visibleCount + spacing * (visibleCount - 1)
+                        val centerVertically = visibleCount <= 4 && totalTicketHeight <= maxHeight
+                        val cardListModifier = when {
+                            centerVertically -> Modifier.fillMaxHeight()
+                            totalTicketHeight <= maxHeight -> Modifier.fillMaxWidth()
+                            else -> Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                        }
                         Column(
-                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(spacing),
+                            cardListModifier,
+                            verticalArrangement = if (centerVertically) {
+                                Arrangement.spacedBy(spacing, Alignment.CenterVertically)
+                            } else {
+                                Arrangement.spacedBy(spacing)
+                            },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             activeIds.take(MAX_ACTIVE).toList().forEachIndexed { index, id ->
@@ -372,10 +383,16 @@ private fun MiBingoApp() {
                                                     checked = allSelected,
                                                     onCheckedChange = { checked ->
                                                         if (checked) {
+                                                            var remaining = (MAX_ACTIVE - selectedSavedIds.size - selectedPackageTicketKeys.size).coerceAtLeast(0)
                                                             packageKeys.forEach { key ->
-                                                                if (key !in selectedPackageTicketKeys && selectedCount + (selectedPackageTicketKeys.size - selectedPackageTicketKeys.count { it in packageKeys }) < MAX_ACTIVE) selectedPackageTicketKeys.add(key)
+                                                                if (key !in selectedPackageTicketKeys && remaining > 0) {
+                                                                    selectedPackageTicketKeys.add(key)
+                                                                    remaining--
+                                                                }
                                                             }
-                                                        } else selectedPackageTicketKeys.removeAll(packageKeys.toSet())
+                                                        } else {
+                                                            selectedPackageTicketKeys.removeAll(packageKeys.toSet())
+                                                        }
                                                     }
                                                 )
                                                 Column(Modifier.weight(1f)) {
@@ -384,7 +401,7 @@ private fun MiBingoApp() {
                                                 }
                                                 TextButton(onClick = {
                                                     if (pkg.id in expandedPackageIds) expandedPackageIds.remove(pkg.id) else expandedPackageIds.add(pkg.id)
-                                                }) { Text(if (pkg.id in expandedPackageIds) "Ocultar" else "Ver") }
+                                                }) { Text(if (pkg.id in expandedPackageIds) "Ocultar" else "Desplegar") }
                                             }
                                             if (pkg.id in expandedPackageIds) {
                                                 pkg.tickets.forEachIndexed { index, ticket ->
