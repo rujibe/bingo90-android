@@ -74,7 +74,9 @@ private fun MiBingoApp() {
             val start = Random.nextInt(0, (cards.size / 6).coerceAtLeast(1)) * 6
             cards.drop(start).take(6).take(count).forEach { activeIds.add(it.id) }
         } else {
-            cards.shuffled().take(count).forEach { activeIds.add(it.id) }
+            val seriesCount = (cards.size / 6).coerceAtLeast(1)
+            val seriesStart = Random.nextInt(seriesCount) * 6
+            cards.drop(seriesStart).take(6).shuffled().take(count).forEach { activeIds.add(it.id) }
         }
         if (activeIds.isEmpty()) {
             val t = Ticket(nextTicketId(cards), "Cartón 1", generateGrid())
