@@ -97,7 +97,7 @@ private fun MiBingoApp() {
 
     Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
         Column(Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)).background(Brush.verticalGradient(listOf(Cream, Yellow)))) {
-            Row(
+            if (!(page == "game" && activeIds.size > 3)) Row(
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
