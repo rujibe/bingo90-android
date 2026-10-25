@@ -99,7 +99,7 @@ private fun MiBingoApp() {
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (page != "home") Text("‹", Modifier.clickable { page = "home" }.padding(end = 14.dp), color = Color.White, style = MaterialTheme.typography.headlineLarge)
+                if (page != "home") Text("‹", Modifier.clickable { (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; page = "home" }.padding(end = 14.dp), color = Color.White, style = MaterialTheme.typography.headlineLarge)
                 Column(Modifier.weight(1f)) {
                     Text(if (page == "home") "MI BINGO" else when (page) {
                         "choose" -> "Elegir cartones"
@@ -132,13 +132,22 @@ private fun MiBingoApp() {
                     OutlinedTextField(value = chooseSearch, onValueChange = { chooseSearch = it.filter { ch -> ch.isDigit() } }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Buscar por número de cartón (1–1000)") })
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         cards.filter { it.id in 1L..1000L && (chooseSearch.isBlank() || it.name.filter { ch -> ch.isDigit() }.contains(chooseSearch)) }.forEach { ticket ->
-                            Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = ticket.id in selectedChooseIds, onCheckedChange = { checked ->
-                                    if (checked && selectedChooseIds.size < count) selectedChooseIds.add(ticket.id)
-                                    if (!checked) selectedChooseIds.remove(ticket.id)
-                                }, enabled = ticket.id in selectedChooseIds || selectedChooseIds.size < count)
-                                Text(ticket.name, Modifier.weight(1f), color = Blue, fontWeight = FontWeight.SemiBold)
-                                Text(ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(" "), style = MaterialTheme.typography.labelSmall, color = Color.DarkGray, maxLines = 1)
+                            Card(
+                                modifier = Modifier.fillMaxWidth().border(1.dp, if (ticket.id in selectedChooseIds) Green else Blue, RoundedCornerShape(6.dp)),
+                                shape = RoundedCornerShape(6.dp),
+                                colors = CardDefaults.cardColors(containerColor = if (ticket.id in selectedChooseIds) Color(0xFFF0FFF0) else Color.White)
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = ticket.id in selectedChooseIds, onCheckedChange = { checked ->
+                                        if (checked && selectedChooseIds.size < count) selectedChooseIds.add(ticket.id)
+                                        if (!checked) selectedChooseIds.remove(ticket.id)
+                                    }, enabled = ticket.id in selectedChooseIds || selectedChooseIds.size < count)
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(ticket.name, color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                        TicketPreviewGrid(ticket.grid)
+                                    }
+                                    Text(if (ticket.id in selectedChooseIds) "✓" else "", color = Green, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 4.dp))
+                                }
                             }
                         }
                     }
@@ -339,6 +348,27 @@ private fun InfoPanel(text: String) {
 }
 
 @Composable
+@Composable
+private fun TicketPreviewGrid(grid: List<List<Int>>) {
+    Column(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(3.dp)).padding(1.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        for (r in 0..2) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                for (c in 0..8) {
+                    val n = grid[r][c]
+                    Box(
+                        Modifier.weight(1f).aspectRatio(1.35f)
+                            .background(if (n > 0) Color(0xFFF1F7FF) else Color(0xFFF8FAFC))
+                            .border(.35.dp, Color(0xFFB7D0F2)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (n > 0) Text(n.toString(), color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.padding(if (compact) 2.dp else 5.dp)) {
