@@ -94,6 +94,9 @@ private fun MiBingoApp() {
     val expandedPackageIds = remember { mutableStateListOf<Long>() }
     var packageNameInput by remember { mutableStateOf("") }
     var showSavePackageDialog by remember { mutableStateOf(false) }
+    var deleteSavedCardId by remember { mutableStateOf<Long?>(null) }
+    var deletePackageTicketKey by remember { mutableStateOf<String?>(null) }
+    var deletePackageId by remember { mutableStateOf<Long?>(null) }
     val selectedChooseIds = remember { mutableStateListOf<Long>() }
     var chooseSearch by remember { mutableStateOf("") }
 
@@ -275,7 +278,9 @@ private fun MiBingoApp() {
                         val preferredHeight = 138.dp
                         val ticketHeight = minOf(availablePerTicket, preferredHeight)
                         val totalTicketHeight = ticketHeight * visibleCount + spacing * (visibleCount - 1)
-                        val centerVertically = totalTicketHeight <= maxHeight
+                        // With five or six tickets, start at the top and preserve the
+                        // reserved bottom margin; fewer tickets remain vertically centered.
+                        val centerVertically = visibleCount < 5 && totalTicketHeight <= maxHeight
                         val cardListModifier = when {
                             centerVertically -> Modifier.fillMaxHeight()
                             totalTicketHeight <= maxHeight -> Modifier.fillMaxWidth()
@@ -400,6 +405,9 @@ private fun MiBingoApp() {
                                                 TextButton(onClick = {
                                                     if (pkg.id in expandedPackageIds) expandedPackageIds.remove(pkg.id) else expandedPackageIds.add(pkg.id)
                                                 }) { Text(if (pkg.id in expandedPackageIds) "Ocultar" else "Desplegar") }
+                                                TextButton(onClick = { deletePackageId = pkg.id }) {
+                                                    Text("Eliminar", color = Red, style = MaterialTheme.typography.labelSmall)
+                                                }
                                             }
                                             if (pkg.id in expandedPackageIds) {
                                                 pkg.tickets.forEachIndexed { index, ticket ->
@@ -416,6 +424,9 @@ private fun MiBingoApp() {
                                                         Column(Modifier.weight(1f)) {
                                                             Text(ticket.name, fontWeight = FontWeight.Medium)
                                                             TicketPreviewGrid(ticket.grid)
+                                                        }
+                                                        TextButton(onClick = { deletePackageTicketKey = key }) {
+                                                            Text("Eliminar", color = Red, style = MaterialTheme.typography.labelSmall)
                                                         }
                                                     }
                                                 }
@@ -448,6 +459,9 @@ private fun MiBingoApp() {
                                             message = ""
                                             page = "create"
                                         }) { Text("Editar") }
+                                        TextButton(onClick = { deleteSavedCardId = ticket.id }) {
+                                            Text("Eliminar", color = Red, style = MaterialTheme.typography.labelSmall)
+                                        }
                                     }
                                 }
                             }
@@ -523,6 +537,81 @@ private fun MiBingoApp() {
                 }
             } }, confirmButton = { TextButton(onClick = { editingCell = -1 }) { Text("Cerrar") } })
     }
+    if (deleteSavedCardId != null) AlertDialog(
+        onDismissRequest = { deleteSavedCardId = null },
+        title = { Text("Eliminar cartón guardado") },
+        text = {
+            val savedName = cards.firstOrNull { it.id == deleteSavedCardId }?.name ?: "este cartón"
+            Text("¿Quieres eliminar «$savedName»? Esta acción no se puede deshacer.")
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val id = deleteSavedCardId
+                if (id != null) {
+                    cards.removeAll { it.id == id }
+                    selectedSavedIds.remove(id)
+                    activeIds.remove(id)
+                    persistActive()
+                    saveCards(ctx, cards)
+                }
+                deleteSavedCardId = null
+            }) { Text("Eliminar", color = Red) }
+        },
+        dismissButton = { TextButton(onClick = { deleteSavedCardId = null }) { Text("Cancelar") } }
+    )
+    if (deletePackageTicketKey != null) {
+        val key = deletePackageTicketKey
+        val parts = key?.split(":")
+        val packageId = parts?.getOrNull(0)?.toLongOrNull()
+        val ticketIndex = parts?.getOrNull(1)?.toIntOrNull()
+        val pkg = ticketPackages.firstOrNull { it.id == packageId }
+        val ticketName = pkg?.tickets?.getOrNull(ticketIndex ?: -1)?.name ?: "este cartón"
+        AlertDialog(
+            onDismissRequest = { deletePackageTicketKey = null },
+            title = { Text("Eliminar cartón del paquete") },
+            text = { Text("¿Quieres eliminar «$ticketName» del paquete «${pkg?.name ?: ""}»? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (packageId != null && ticketIndex != null) {
+                        val packagePosition = ticketPackages.indexOfFirst { it.id == packageId }
+                        if (packagePosition >= 0) {
+                            val currentPackage = ticketPackages[packagePosition]
+                            if (ticketIndex in currentPackage.tickets.indices) {
+                                val updatedTickets = currentPackage.tickets.toMutableList().apply { removeAt(ticketIndex) }
+                                ticketPackages[packagePosition] = currentPackage.copy(tickets = updatedTickets)
+                                // Clear this package's selected keys so shifted indices cannot select the wrong card.
+                                selectedPackageTicketKeys.removeAll { it.startsWith("$packageId:") }
+                                saveTicketPackages(ctx, ticketPackages)
+                            }
+                        }
+                    }
+                    deletePackageTicketKey = null
+                }) { Text("Eliminar", color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { deletePackageTicketKey = null }) { Text("Cancelar") } }
+        )
+    }
+    if (deletePackageId != null) AlertDialog(
+        onDismissRequest = { deletePackageId = null },
+        title = { Text("Eliminar paquete") },
+        text = {
+            val packageName = ticketPackages.firstOrNull { it.id == deletePackageId }?.name ?: "este paquete"
+            Text("¿Quieres eliminar el paquete «$packageName» completo y todos sus cartones guardados?")
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val id = deletePackageId
+                if (id != null) {
+                    ticketPackages.removeAll { it.id == id }
+                    selectedPackageTicketKeys.removeAll { it.startsWith("$id:") }
+                    expandedPackageIds.remove(id)
+                    saveTicketPackages(ctx, ticketPackages)
+                }
+                deletePackageId = null
+            }) { Text("Eliminar", color = Red) }
+        },
+        dismissButton = { TextButton(onClick = { deletePackageId = null }) { Text("Cancelar") } }
+    )
     if (showSavePackageDialog) AlertDialog(
         onDismissRequest = { showSavePackageDialog = false },
         title = { Text("Guardar paquete") },
