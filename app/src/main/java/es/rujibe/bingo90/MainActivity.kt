@@ -110,8 +110,7 @@ private fun MiBingoApp() {
             when (page) {
                 "home" -> HomePage(
                     onChoose = { page = "choose" },
-                    onRandom = { startGame("random") },
-                    onCount = { page = "count" },
+                    onRandom = { page = "random" },
                     onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; page = "create" },
                     onSaved = { page = "saved" }
                 )
