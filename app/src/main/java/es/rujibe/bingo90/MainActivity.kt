@@ -90,10 +90,10 @@ private fun MiBingoApp() {
     val packageSignatures = ticketPackages.flatMap { it.tickets }.map {
         it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",")
     }.toSet()
+    // Old builds copied package tickets into the standalone library. Remove matching
+    // copies regardless of their legacy display name, while keeping unrelated singles.
     val legacyDuplicates = cards.filter { ticket ->
-        ticket.id !in (1L..1000L) &&
-            ticket.name.startsWith("Guardado - ") &&
-            ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",") in packageSignatures
+        ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",") in packageSignatures
     }
     if (legacyDuplicates.isNotEmpty()) {
         cards.removeAll(legacyDuplicates.toSet())
@@ -293,13 +293,14 @@ private fun MiBingoApp() {
                         contentAlignment = Alignment.TopCenter
                     ) {
                         val visibleCount = activeIds.size.coerceIn(1, MAX_ACTIVE)
-                        val spacing = 3.dp
-                        // Calculate each ticket from the actual height available on this phone.
-                        // All 4, 5 or 6 active tickets share the full area: no vertical scrolling
-                        // and no fixed minimum height that can push the last ticket off-screen.
+                        val spacing = 2.dp
+                        // Reserve no artificial bottom margin: distribute the entire available
+                        // height between tickets, accounting for each card's blue header.
                         val ticketHeight = ((maxHeight - spacing * (visibleCount - 1)) / visibleCount)
                             .coerceAtLeast(1.dp)
-                        val numberFontSize = (ticketHeight.value * 0.22f).coerceIn(14f, 24f)
+                        val headerHeight = (ticketHeight.value * 0.16f).coerceIn(12f, 19f)
+                        val numberFontSize = ((ticketHeight.value - headerHeight) / 3f * 0.64f)
+                            .coerceIn(11f, 20f)
                         Column(
                             Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(spacing),
@@ -313,7 +314,8 @@ private fun MiBingoApp() {
                                         index + 1,
                                         compact = true,
                                         numberFontSize = numberFontSize,
-                                        modifier = Modifier.fillMaxWidth()
+                                        compactHeaderHeight = headerHeight,
+                                        modifier = Modifier.fillMaxWidth(0.90f)
                                             .widthIn(max = 540.dp)
                                             .height(ticketHeight),
                                         onToggle = { n ->
@@ -783,12 +785,12 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 }
 
 @Composable
-private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, numberFontSize: Float = 15f, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
+private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, numberFontSize: Float = 15f, compactHeaderHeight: Float = 21f, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.fillMaxSize().padding(if (compact) 0.dp else 5.dp)) {
             if (compact) {
                 Row(
-                    Modifier.fillMaxWidth().height(21.dp).background(
+                    Modifier.fillMaxWidth().height(compactHeaderHeight.dp).background(
                         Blue
                     ).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
