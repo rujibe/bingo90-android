@@ -85,6 +85,20 @@ private fun MiBingoApp() {
             mutableStateListOf<TicketPackage>().apply { addAll(migrated) }
         } else mutableStateListOf<TicketPackage>().apply { addAll(loaded) }
     }
+    // Remove legacy individual copies created by the old "Guardar cartones" action
+    // when the same ticket already belongs to a saved package. Keep user-created singles.
+    val packageSignatures = ticketPackages.flatMap { it.tickets }.map {
+        it.grid.flatten().filter { n -> n > 0 }.sorted().joinToString(",")
+    }.toSet()
+    val legacyDuplicates = cards.filter { ticket ->
+        ticket.id !in (1L..1000L) &&
+            ticket.name.startsWith("Guardado - ") &&
+            ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",") in packageSignatures
+    }
+    if (legacyDuplicates.isNotEmpty()) {
+        cards.removeAll(legacyDuplicates.toSet())
+        saveCards(ctx, cards)
+    }
     val activeIds = remember { mutableStateListOf<Long>().apply {
         addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } || ticketPackages.any { p -> p.tickets.any { it.id == id } } }.distinct().take(MAX_ACTIVE))
     } }
@@ -133,28 +147,6 @@ private fun MiBingoApp() {
             saveAllTickets(); clearMarksSnapshot(ctx); canUndoMarks = false
             message = "Se han recuperado las marcas anteriores."
         }
-    }
-    fun saveActiveCardsToLibrary(): Int {
-        val toSave = cards.filter { it.id in activeIds }
-        var added = 0
-        toSave.forEach { ticket ->
-            val signature = ticket.grid.flatten().filter { it > 0 }.sorted().joinToString(",")
-            val alreadySaved = cards.any { saved ->
-                saved.id !in (1L..1000L) &&
-                    saved.grid.flatten().filter { it > 0 }.sorted().joinToString(",") == signature
-            }
-            if (!alreadySaved && ticket.id in (1L..1000L)) {
-                cards.add(ticket.copy(
-                    id = nextAvailableTicketId(),
-                    name = "Guardado - " + ticket.name,
-                    marked = emptySet()
-                ))
-                added++
-            }
-        }
-        saveSeries(ctx, toSave)
-        saveAllTickets()
-        return added
     }
     fun addTicket(ticket: Ticket) {
         if (activeIds.size < MAX_ACTIVE && ticket.id !in activeIds) activeIds.add(ticket.id)
@@ -305,10 +297,12 @@ private fun MiBingoApp() {
                         // so the last ticket does not sit flush against the bottom edge.
                         val verticalBreathingRoom = if (visibleCount >= 5) 24.dp else 0.dp
                         val availablePerTicket = (maxHeight - spacing * (visibleCount - 1) - verticalBreathingRoom) / visibleCount
-                        // Preserve the familiar 138dp ticket height where possible.
-                        // For 5–6 tickets, shrink only as much as needed to fit them all.
+                        // Keep each ticket large enough to read on compact phones. If five or
+                        // six tickets cannot fit at this height, make the list scroll instead
+                        // of squeezing the numbers until they are clipped or illegible.
                         val preferredHeight = 138.dp
-                        val ticketHeight = minOf(availablePerTicket, preferredHeight)
+                        val minimumReadableHeight = 116.dp
+                        val ticketHeight = minOf(preferredHeight, maxOf(minimumReadableHeight, availablePerTicket))
                         val totalTicketHeight = ticketHeight * visibleCount + spacing * (visibleCount - 1)
                         // With five or six tickets, start at the top and preserve the
                         // reserved bottom margin; fewer tickets remain vertically centered.
@@ -702,13 +696,13 @@ private fun MiBingoApp() {
             ) { Text("📦 Guardar como paquete") }
             TextButton(
                 onClick = {
-                    val added = saveActiveCardsToLibrary()
-                    message = if (added > 0) "Se han guardado $added cartones nuevos." else "Estos cartones ya estaban guardados."
+                    showSavePackageDialog = true
+                    packageNameInput = ""
                     options = false
                 },
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(8.dp)
-            ) { Text("💾 Guardar cartones") }
+            ) { Text("📦 Guardar cartones como paquete") }
             HorizontalDivider()
             Text("¿Desea jugar con los mismos cartones?", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
