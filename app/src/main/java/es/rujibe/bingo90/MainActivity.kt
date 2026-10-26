@@ -167,22 +167,14 @@ private fun MiBingoApp() {
             selectedChooseIds.take(count).forEach { activeIds.add(it) }
             if (activeIds.isEmpty()) cards.shuffled().take(count).forEach { activeIds.add(it.id) }
         } else {
-            // Random play takes tickets from one complete 6-ticket strip.
-            // Tickets in a strip partition 1..90, so numbers never repeat between them.
-            val strips = cards
-                .filter { it.id in 1L..1000L }
-                .groupBy { (it.id - 1L) / 6L }
-                .values
-                .filter { it.size == 6 }
-            val strip = strips.randomOrNull()
-            if (strip != null) {
-                strip.shuffled().take(count).forEach { activeIds.add(it.id) }
-            } else {
-                generateSeries().take(count).forEachIndexed { index, grid ->
-                    val ticket = Ticket(nextAvailableTicketId(), "Aleatorio ${index + 1}", grid)
-                    cards.add(ticket)
-                    activeIds.add(ticket.id)
-                }
+            // Generate a fresh, complete strip for this random game. This avoids
+            // relying on saved ticket IDs/order, which can differ between devices.
+            // A strip has six tickets and each number 1..90 appears exactly once.
+            val randomStrip = generateSeries()
+            randomStrip.shuffled().take(count.coerceIn(1, MAX_ACTIVE)).forEachIndexed { index, grid ->
+                val ticket = Ticket(nextAvailableTicketId(), "Aleatorio ${index + 1}", grid)
+                cards.add(ticket)
+                activeIds.add(ticket.id)
             }
         }
         if (activeIds.isEmpty()) {
@@ -854,7 +846,7 @@ private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false,
                                 n.toString(),
                                 color = if (marked) Color.White else Blue,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = if (compact) 19.sp else 15.sp,
+                                fontSize = if (compact) (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp / 20f).coerceIn(12f, 19f).sp else 15.sp,
                                 maxLines = 1,
                                 textAlign = TextAlign.Center
                             )
