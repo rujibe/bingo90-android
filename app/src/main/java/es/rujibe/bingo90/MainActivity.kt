@@ -346,15 +346,17 @@ private fun MiBingoApp() {
                                             .widthIn(max = 540.dp)
                                             .height(ticketHeight),
                                         onToggle = { n ->
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) {
-                                                findTicket(id)?.let { old -> snapshotMarks(); replaceTicket(old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)); saveAllTickets() }
+                                            findTicket(id)?.let { old ->
+                                                snapshotMarks()
+                                                replaceTicket(old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n))
+                                                saveAllTickets()
                                             }
                                         },
                                         onClear = {
-                                            val j = cards.indexOfFirst { it.id == id }
-                                            if (j >= 0) {
-                                                findTicket(id)?.let { old -> snapshotMarks(); replaceTicket(old.copy(marked = emptySet())); saveAllTickets() }
+                                            findTicket(id)?.let { old ->
+                                                snapshotMarks()
+                                                replaceTicket(old.copy(marked = emptySet()))
+                                                saveAllTickets()
                                             }
                                         },
                                         onRemove = {
