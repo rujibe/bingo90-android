@@ -185,7 +185,7 @@ private fun MiBingoApp() {
     Box((if (page == "game" && activeIds.size > 3) Modifier.fillMaxSize().background(if (compactSix) Color(0xFF064AA8) else Color.White) else Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkRed, Red, Color(0xFFB70E18)))).padding(5.dp).border(2.dp, Yellow, RoundedCornerShape(13.dp)).padding(5.dp))) {
         Column(Modifier.fillMaxSize().clip(RoundedCornerShape(if (compactSix) 0.dp else 9.dp)).then(if (compactSix) Modifier.background(Color(0xFF064AA8)) else Modifier.background(Brush.verticalGradient(listOf(Cream, Yellow))))) {
             if (!(page == "game" && landscape && activeIds.size > 4)) Row(
-                Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = 10.dp),
+                Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFE51B24), Red))).padding(horizontal = 12.dp, vertical = if (page == "game") 3.dp else 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (page != "home") Text("‹", Modifier.clickable { (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; page = "home" }.padding(end = 14.dp), color = Color.White, style = MaterialTheme.typography.headlineLarge)
@@ -263,26 +263,27 @@ private fun MiBingoApp() {
                     Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().height(36.dp),
+                        Modifier.fillMaxWidth().height(31.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Cartones: ${activeIds.size}/6",
+                            "${activeIds.size} cartones",
                             Modifier.weight(1f),
                             fontWeight = FontWeight.Bold,
+                            maxLines = 1,
                             style = MaterialTheme.typography.labelMedium
                         )
                         TextButton(
                             onClick = { options = true },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) { Text("Opciones") }
+                            contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
+                        ) { Text("Opciones", maxLines = 1) }
                         TextButton(
                             onClick = {
                                 packageNameInput = ""
                                 showSavePackageDialog = true
                             },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) { Text("Guardar paquete") }
+                            contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
+                        ) { Text("Guardar", maxLines = 1) }
                     }
                     if (message.isNotBlank()) {
                         Text(message, color = Green, style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -292,33 +293,16 @@ private fun MiBingoApp() {
                         contentAlignment = Alignment.TopCenter
                     ) {
                         val visibleCount = activeIds.size.coerceIn(1, MAX_ACTIVE)
-                        val spacing = 4.dp
-                        // When using six tickets, leave some breathing room at both ends
-                        // so the last ticket does not sit flush against the bottom edge.
-                        val verticalBreathingRoom = if (visibleCount >= 5) 24.dp else 0.dp
-                        val availablePerTicket = (maxHeight - spacing * (visibleCount - 1) - verticalBreathingRoom) / visibleCount
-                        // Keep each ticket large enough to read on compact phones. If five or
-                        // six tickets cannot fit at this height, make the list scroll instead
-                        // of squeezing the numbers until they are clipped or illegible.
-                        val preferredHeight = 138.dp
-                        val minimumReadableHeight = 116.dp
-                        val ticketHeight = minOf(preferredHeight, maxOf(minimumReadableHeight, availablePerTicket))
-                        val totalTicketHeight = ticketHeight * visibleCount + spacing * (visibleCount - 1)
-                        // With five or six tickets, start at the top and preserve the
-                        // reserved bottom margin; fewer tickets remain vertically centered.
-                        val centerVertically = visibleCount < 5 && totalTicketHeight <= maxHeight
-                        val cardListModifier = when {
-                            centerVertically -> Modifier.fillMaxHeight()
-                            totalTicketHeight <= maxHeight -> Modifier.fillMaxWidth()
-                            else -> Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                        }
+                        val spacing = 3.dp
+                        // Calculate each ticket from the actual height available on this phone.
+                        // All 4, 5 or 6 active tickets share the full area: no vertical scrolling
+                        // and no fixed minimum height that can push the last ticket off-screen.
+                        val ticketHeight = ((maxHeight - spacing * (visibleCount - 1)) / visibleCount)
+                            .coerceAtLeast(1.dp)
+                        val numberFontSize = (ticketHeight.value * 0.22f).coerceIn(14f, 24f)
                         Column(
-                            cardListModifier,
-                            verticalArrangement = if (centerVertically) {
-                                Arrangement.spacedBy(spacing, Alignment.CenterVertically)
-                            } else {
-                                Arrangement.spacedBy(spacing)
-                            },
+                            Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(spacing),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             activeIds.take(MAX_ACTIVE).toList().forEachIndexed { index, id ->
@@ -328,7 +312,8 @@ private fun MiBingoApp() {
                                         ticket,
                                         index + 1,
                                         compact = true,
-                                        modifier = Modifier.fillMaxWidth(0.90f)
+                                        numberFontSize = numberFontSize,
+                                        modifier = Modifier.fillMaxWidth()
                                             .widthIn(max = 540.dp)
                                             .height(ticketHeight),
                                         onToggle = { n ->
@@ -798,7 +783,7 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
 }
 
 @Composable
-private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
+private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false, numberFontSize: Float = 15f, modifier: Modifier = Modifier, onToggle: (Int) -> Unit, onClear: () -> Unit, onRemove: () -> Unit) {
     Card(modifier.fillMaxWidth().border(1.dp, Blue, RoundedCornerShape(5.dp)), shape = RoundedCornerShape(5.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.fillMaxSize().padding(if (compact) 0.dp else 5.dp)) {
             if (compact) {
@@ -840,7 +825,7 @@ private fun TicketPanel(ticket: Ticket, position: Int, compact: Boolean = false,
                                 n.toString(),
                                 color = if (marked) Color.White else Blue,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = if (compact) (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp / 20f).coerceIn(12f, 19f).sp else 15.sp,
+                                fontSize = if (compact) numberFontSize.sp else 15.sp,
                                 maxLines = 1,
                                 textAlign = TextAlign.Center
                             )
