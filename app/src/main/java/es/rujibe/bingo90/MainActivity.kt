@@ -75,8 +75,18 @@ private fun MiBingoApp() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val cards = remember { mutableStateListOf<Ticket>().apply { addAll(loadCards(ctx)) } }
+    val ticketPackages = remember {
+        val loaded = loadTicketPackages(ctx)
+        val ids = cards.map { it.id } + loaded.flatMap { it.tickets.map { t -> t.id } }
+        if (ids.size != ids.distinct().size) {
+            var nextId = maxOf(System.currentTimeMillis(), (ids.maxOrNull() ?: 0L) + 1L)
+            val migrated = loaded.map { p -> p.copy(tickets = p.tickets.map { it.copy(id = nextId++) }) }
+            saveTicketPackages(ctx, migrated)
+            mutableStateListOf<TicketPackage>().apply { addAll(migrated) }
+        } else mutableStateListOf<TicketPackage>().apply { addAll(loaded) }
+    }
     val activeIds = remember { mutableStateListOf<Long>().apply {
-        addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } }.distinct().take(MAX_ACTIVE))
+        addAll(loadActiveIds(ctx).filter { id -> cards.any { it.id == id } || ticketPackages.any { p -> p.tickets.any { it.id == id } } }.distinct().take(MAX_ACTIVE))
     } }
     var page by remember { mutableStateOf("home") }
     var count by remember { mutableIntStateOf(6) }
@@ -85,13 +95,13 @@ private fun MiBingoApp() {
     var confirmClearMarks by remember { mutableStateOf(false) }
     var canUndoMarks by remember { mutableStateOf(hasMarksSnapshot(ctx)) }
     var nameInput by remember { mutableStateOf("") }
+    var groupNameInput by remember { mutableStateOf("") }
     var numbersInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editorGrid by remember { mutableStateOf(List(3) { List(9) { 0 } }) }
     var editingCell by remember { mutableIntStateOf(-1) }
     val selectedSavedIds = remember { mutableStateListOf<Long>() }
-    val ticketPackages = remember { mutableStateListOf<TicketPackage>().apply { addAll(loadTicketPackages(ctx)) } }
     val selectedPackageTicketKeys = remember { mutableStateListOf<String>() }
     val expandedPackageIds = remember { mutableStateListOf<Long>() }
     var packageNameInput by remember { mutableStateOf("") }
@@ -102,18 +112,25 @@ private fun MiBingoApp() {
     val selectedChooseIds = remember { mutableStateListOf<Long>() }
     var chooseSearch by remember { mutableStateOf("") }
 
+    fun allTickets(): List<Ticket> = cards.toList() + ticketPackages.flatMap { it.tickets }
+    fun nextAvailableTicketId(): Long = nextTicketId(allTickets())
+    fun findTicket(id: Long): Ticket? = cards.firstOrNull { it.id == id } ?: ticketPackages.firstNotNullOfOrNull { p -> p.tickets.firstOrNull { it.id == id } }
+    fun replaceTicket(ticket: Ticket) {
+        val ci = cards.indexOfFirst { it.id == ticket.id }
+        if (ci >= 0) cards[ci] = ticket else {
+            val pi = ticketPackages.indexOfFirst { p -> p.tickets.any { it.id == ticket.id } }
+            if (pi >= 0) { val p = ticketPackages[pi]; ticketPackages[pi] = p.copy(tickets = p.tickets.map { if (it.id == ticket.id) ticket else it }) }
+        }
+    }
+    fun saveAllTickets() { saveCards(ctx, cards); saveTicketPackages(ctx, ticketPackages) }
     fun persistActive() = saveActiveIds(ctx, activeIds.toList())
-    fun snapshotMarks() { saveMarksSnapshot(ctx, cards); canUndoMarks = true }
+    fun snapshotMarks() { saveMarksSnapshot(ctx, allTickets()); canUndoMarks = true }
     fun undoMarks() {
         val snapshot = loadMarksSnapshot(ctx)
         if (snapshot != null) {
-            cards.indices.forEach { i ->
-                val previous = snapshot[cards[i].id]
-                if (previous != null) cards[i] = cards[i].copy(marked = previous)
-            }
-            saveCards(ctx, cards)
-            clearMarksSnapshot(ctx)
-            canUndoMarks = false
+            cards.indices.forEach { i -> snapshot[cards[i].id]?.let { cards[i] = cards[i].copy(marked = it) } }
+            ticketPackages.indices.forEach { pi -> val p = ticketPackages[pi]; ticketPackages[pi] = p.copy(tickets = p.tickets.map { t -> snapshot[t.id]?.let { t.copy(marked = it) } ?: t }) }
+            saveAllTickets(); clearMarksSnapshot(ctx); canUndoMarks = false
             message = "Se han recuperado las marcas anteriores."
         }
     }
@@ -128,7 +145,7 @@ private fun MiBingoApp() {
             }
             if (!alreadySaved && ticket.id in (1L..1000L)) {
                 cards.add(ticket.copy(
-                    id = nextTicketId(cards),
+                    id = nextAvailableTicketId(),
                     name = "Guardado - " + ticket.name,
                     marked = emptySet()
                 ))
@@ -136,7 +153,7 @@ private fun MiBingoApp() {
             }
         }
         saveSeries(ctx, toSave)
-        saveCards(ctx, cards)
+        saveAllTickets()
         return added
     }
     fun addTicket(ticket: Ticket) {
@@ -162,7 +179,7 @@ private fun MiBingoApp() {
                 strip.shuffled().take(count).forEach { activeIds.add(it.id) }
             } else {
                 generateSeries().take(count).forEachIndexed { index, grid ->
-                    val ticket = Ticket(nextTicketId(cards), "Aleatorio ${index + 1}", grid)
+                    val ticket = Ticket(nextAvailableTicketId(), "Aleatorio ${index + 1}", grid)
                     cards.add(ticket)
                     activeIds.add(ticket.id)
                 }
@@ -174,7 +191,8 @@ private fun MiBingoApp() {
         }
         snapshotMarks()
         cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
-        saveCards(ctx, cards); persistActive()
+        ticketPackages.indices.forEach { pi -> val p = ticketPackages[pi]; ticketPackages[pi] = p.copy(tickets = p.tickets.map { if (it.id in activeIds) it.copy(marked = emptySet()) else it }) }
+        saveAllTickets(); persistActive()
         page = "game"
         (ctx as? ComponentActivity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
@@ -209,7 +227,7 @@ private fun MiBingoApp() {
                     onResume = { page = "game" },
                     showResume = activeIds.isNotEmpty(),
                     onRandom = { page = "random" },
-                    onCreate = { nameInput = ""; numbersInput = ""; message = ""; editingId = null; editorGrid = List(3) { List(9) { 0 } }; page = "create" },
+                    onCreate = { nameInput = ""; groupNameInput = ""; numbersInput = ""; message = ""; editingId = null; editorGrid = List(3) { List(9) { 0 } }; page = "create" },
                     onSaved = { page = "saved" }
                 )
                 "choose" -> Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -318,9 +336,8 @@ private fun MiBingoApp() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             activeIds.take(MAX_ACTIVE).toList().forEachIndexed { index, id ->
-                                val ticketIndex = cards.indexOfFirst { it.id == id }
-                                if (ticketIndex >= 0) {
-                                    val ticket = cards[ticketIndex]
+                                val ticket = findTicket(id)
+                                if (ticket != null) {
                                     TicketPanel(
                                         ticket,
                                         index + 1,
@@ -331,18 +348,13 @@ private fun MiBingoApp() {
                                         onToggle = { n ->
                                             val j = cards.indexOfFirst { it.id == id }
                                             if (j >= 0) {
-                                                val old = cards[j]
-                                                snapshotMarks()
-                                                cards[j] = old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)
-                                                saveCards(ctx, cards)
+                                                findTicket(id)?.let { old -> snapshotMarks(); replaceTicket(old.copy(marked = if (n in old.marked) old.marked - n else old.marked + n)); saveAllTickets() }
                                             }
                                         },
                                         onClear = {
                                             val j = cards.indexOfFirst { it.id == id }
                                             if (j >= 0) {
-                                                snapshotMarks()
-                                                cards[j] = cards[j].copy(marked = emptySet())
-                                                saveCards(ctx, cards)
+                                                findTicket(id)?.let { old -> snapshotMarks(); replaceTicket(old.copy(marked = emptySet())); saveAllTickets() }
                                             }
                                         },
                                         onRemove = {
@@ -359,6 +371,8 @@ private fun MiBingoApp() {
                 "create" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Nombre del cartón:", fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Mi cartón favorito") }, singleLine = true)
+                    OutlinedTextField(value = groupNameInput, onValueChange = { groupNameInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Grupo o paquete (opcional)") }, placeholder = { Text("Ej. Familia, Amigos...") }, singleLine = true)
+                    Text("Usa el mismo nombre para agrupar cartones. Déjalo vacío para guardarlo suelto.", style = MaterialTheme.typography.bodySmall)
                     Text("Toca una casilla para elegir el número. Debe haber 15 números y 5 por fila.", style = MaterialTheme.typography.bodySmall)
                     Column(Modifier.fillMaxWidth().border(2.dp, Blue, RoundedCornerShape(5.dp)).background(Color.White).padding(2.dp)) {
                         for (r in 0..2) Row(Modifier.fillMaxWidth()) {
@@ -381,9 +395,25 @@ private fun MiBingoApp() {
                             (0..8).all { c -> (0..2).map { r -> editorGrid[r][c] }.filter { it > 0 }.all { n -> n in (if (c == 0) 1 else c * 10)..(if (c == 8) 90 else c * 10 + 9) } }
                         if (!valid) message = "Completa 15 números únicos, 5 por fila y en la columna correcta."
                         else {
-                            val ticket = Ticket(editingId ?: nextTicketId(cards), nameInput.ifBlank { "Mi cartón ${cards.count { it.id !in (1L..1000L) } + 1}" }, editorGrid.map { it.toList() })
-                            if (editingId != null) { val i = cards.indexOfFirst { it.id == editingId }; if (i >= 0) cards[i] = ticket else cards.add(ticket) } else cards.add(ticket)
-                            saveCards(ctx, cards); message = "¡Cartón guardado correctamente!"; editingId = ticket.id
+                            val ticket = Ticket(editingId ?: nextAvailableTicketId(), nameInput.ifBlank { "Mi cartón ${allTickets().count { it.id !in (1L..1000L) } + 1}" }, editorGrid.map { it.toList() })
+                            val group = groupNameInput.trim()
+                            val oldPi = ticketPackages.indexOfFirst { p -> p.tickets.any { it.id == ticket.id } }
+                            if (group.isBlank()) {
+                                if (oldPi >= 0) { val p = ticketPackages[oldPi]; val remaining = p.tickets.filterNot { it.id == ticket.id }; if (remaining.isEmpty()) ticketPackages.removeAt(oldPi) else ticketPackages[oldPi] = p.copy(tickets = remaining) }
+                                val ci = cards.indexOfFirst { it.id == ticket.id }; if (ci >= 0) cards[ci] = ticket else cards.add(ticket)
+                            } else {
+                                val target = ticketPackages.indexOfFirst { it.name.equals(group, true) }
+                                if (oldPi >= 0 && target >= 0 && ticketPackages[oldPi].id == ticketPackages[target].id) {
+                                    val p = ticketPackages[oldPi]; ticketPackages[oldPi] = p.copy(tickets = p.tickets.map { if (it.id == ticket.id) ticket else it })
+                                } else {
+                                    if (oldPi >= 0) { val p = ticketPackages[oldPi]; val rem = p.tickets.filterNot { it.id == ticket.id }; if (rem.isEmpty()) ticketPackages.removeAt(oldPi) else ticketPackages[oldPi] = p.copy(tickets = rem) }
+                                    cards.removeAll { it.id == ticket.id }
+                                    val dest = ticketPackages.indexOfFirst { it.name.equals(group, true) }
+                                    if (dest >= 0) { val p = ticketPackages[dest]; ticketPackages[dest] = p.copy(tickets = p.tickets + ticket) }
+                                    else ticketPackages.add(TicketPackage(System.currentTimeMillis(), group, listOf(ticket)))
+                                }
+                            }
+                            saveAllTickets(); message = if (group.isBlank()) "¡Cartón guardado correctamente!" else "¡Cartón guardado en el grupo «$group»!"; editingId = ticket.id
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text("Guardar cartón") }
                     InfoPanel("Los cartones se guardan en este móvil para futuras partidas sin conexión.")
@@ -424,7 +454,7 @@ private fun MiBingoApp() {
                                                 )
                                                 Column(Modifier.weight(1f)) {
                                                     Text(pkg.name, fontWeight = FontWeight.Bold)
-                                                    Text("${pkg.tickets.size} cartones · copias independientes", style = MaterialTheme.typography.bodySmall)
+                                                    Text("${pkg.tickets.size} cartones · selección directa", style = MaterialTheme.typography.bodySmall)
                                                 }
                                                 TextButton(onClick = {
                                                     if (pkg.id in expandedPackageIds) expandedPackageIds.remove(pkg.id) else expandedPackageIds.add(pkg.id)
@@ -449,6 +479,7 @@ private fun MiBingoApp() {
                                                             Text(ticket.name, fontWeight = FontWeight.Medium)
                                                             TicketPreviewGrid(ticket.grid)
                                                         }
+                                                        TextButton(onClick = { nameInput = ticket.name; groupNameInput = pkg.name; numbersInput = ""; editorGrid = ticket.grid.map { it.toList() }; editingId = ticket.id; message = ""; page = "create" }) { Text("Editar") }
                                                         TextButton(onClick = { deletePackageTicketKey = key }) {
                                                             Text("Eliminar", color = Red, style = MaterialTheme.typography.labelSmall)
                                                         }
@@ -477,6 +508,7 @@ private fun MiBingoApp() {
                                         }
                                         TextButton(onClick = {
                                             nameInput = ticket.name
+                                            groupNameInput = ""
                                             numbersInput = ""
                                             editorGrid = ticket.grid.map { it.toList() }
                                             editingId = ticket.id
@@ -504,21 +536,13 @@ private fun MiBingoApp() {
                                         val ticketIndex = parts.getOrNull(1)?.toIntOrNull()
                                         val pkg = ticketPackages.firstOrNull { it.id == pkgId }
                                         val source = pkg?.tickets?.getOrNull(ticketIndex ?: -1)
-                                        if (source != null) {
-                                            val copy = source.copy(
-                                                id = nextTicketId(cards),
-                                                name = "${pkg.name} - ${source.name}",
-                                                marked = emptySet()
-                                            )
-                                            cards.add(copy)
-                                            activeIds.add(copy.id)
-                                        }
+                                        if (source != null && source.id !in activeIds) activeIds.add(source.id)
                                     }
                                 }
                                 snapshotMarks()
                                 cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
-                                saveCards(ctx, cards)
-                                persistActive()
+                                ticketPackages.indices.forEach { pi -> val p = ticketPackages[pi]; ticketPackages[pi] = p.copy(tickets = p.tickets.map { if (it.id in activeIds) it.copy(marked = emptySet()) else it }) }
+                                saveAllTickets(); persistActive()
                                 selectedSavedIds.clear()
                                 selectedPackageTicketKeys.clear()
                                 page = "game"
@@ -529,6 +553,7 @@ private fun MiBingoApp() {
                         ) { Text("Jugar con $selectedCount cartones") }
                         BigButton("+", "Crear nuevo cartón", "", Blue) {
                             nameInput = ""
+                            groupNameInput = ""
                             numbersInput = ""
                             editorGrid = List(3) { List(9) { 0 } }
                             editingId = null
@@ -642,7 +667,7 @@ private fun MiBingoApp() {
         title = { Text("Guardar paquete") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Se guardarán copias independientes de los ${activeIds.size} cartones de esta partida.")
+                Text("Se guardará un paquete para seleccionar estos cartones directamente más adelante, sin crear copias sueltas.")
                 OutlinedTextField(
                     value = packageNameInput,
                     onValueChange = { packageNameInput = it },
@@ -654,8 +679,9 @@ private fun MiBingoApp() {
         },
         confirmButton = {
             TextButton(onClick = {
-                val selected = cards.filter { it.id in activeIds }.mapIndexed { index, ticket ->
-                    ticket.copy(id = index.toLong() + 1L, name = "Cartón ${index + 1}", marked = emptySet(), grid = ticket.grid.map { it.toList() })
+                var newPackageTicketId = nextAvailableTicketId()
+                val selected = allTickets().filter { it.id in activeIds }.mapIndexed { index, ticket ->
+                    ticket.copy(id = newPackageTicketId++, name = "Cartón ${index + 1}", marked = emptySet(), grid = ticket.grid.map { it.toList() })
                 }
                 if (selected.isNotEmpty() && packageNameInput.isNotBlank()) {
                     ticketPackages.add(TicketPackage(System.currentTimeMillis(), packageNameInput.trim(), selected))
@@ -715,7 +741,8 @@ private fun MiBingoApp() {
         confirmButton = { TextButton(onClick = {
             snapshotMarks()
             cards.indices.forEach { i -> if (cards[i].id in activeIds) cards[i] = cards[i].copy(marked = emptySet()) }
-            saveCards(ctx, cards)
+            ticketPackages.indices.forEach { pi -> val p = ticketPackages[pi]; ticketPackages[pi] = p.copy(tickets = p.tickets.map { if (it.id in activeIds) it.copy(marked = emptySet()) else it }) }
+            saveAllTickets()
             confirmClearMarks = false
             options = false
             message = "Marcas borradas. ¡Nueva partida!"
@@ -956,7 +983,7 @@ private fun saveTicketPackages(ctx: Context, packages: List<TicketPackage>) {
             val item = JSONObject().put("id", ticket.id).put("name", ticket.name)
             val rows = JSONArray()
             ticket.grid.forEach { rows.put(JSONArray(it)) }
-            item.put("grid", rows).put("marked", JSONArray())
+            item.put("grid", rows).put("marked", JSONArray(ticket.marked.toList()))
             arr.put(item)
         }
         obj.put("tickets", arr)
@@ -978,7 +1005,8 @@ private fun loadTicketPackages(ctx: Context): List<TicketPackage> {
                     val row = rows.getJSONArray(r)
                     (0 until row.length()).map { c -> row.getInt(c) }
                 }
-                Ticket(item.optLong("id", ti.toLong()), item.getString("name"), grid)
+                val marks = item.optJSONArray("marked")
+                Ticket(item.optLong("id", ti.toLong()), item.getString("name"), grid, if (marks == null) emptySet() else (0 until marks.length()).map { marks.getInt(it) }.toSet())
             }
             TicketPackage(obj.getLong("id"), obj.getString("name"), tickets)
         }
