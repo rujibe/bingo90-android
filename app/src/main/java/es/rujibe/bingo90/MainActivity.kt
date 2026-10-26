@@ -798,12 +798,12 @@ private fun TicketPreviewGrid(grid: List<List<Int>>) {
                 for (c in 0..8) {
                     val n = grid[r][c]
                     Box(
-                        Modifier.weight(1f).aspectRatio(1.35f)
+                        Modifier.weight(1f).height(22.dp)
                             .background(Color.White)
                             .border(.35.dp, Color(0xFFB7D0F2)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (n > 0) Text(n.toString(), color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        if (n > 0) Text(n.toString(), color = Blue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 11.sp), maxLines = 1, textAlign = TextAlign.Center)
                     }
                 }
             }
